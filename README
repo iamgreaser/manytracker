@@ -1,0 +1,62 @@
+ok so current status:
+
+it works fairly well as a player, considering i haven't been working on it for very long.
+
+it has:
+- instruments!
+- filters!
+- buggy ping-pong loops!
+- buggy NNAs!
+- surround sound!
+- IT v1 instruments!
+- backwards compatibility with old IT versions!
+- no attempt at modplug compatibility! yes, that's ACTUALLY A FEATURE!
+- close adherence to the ITTECH.TXT flowchart!
+- amiga slides!
+- PROPER IT-STYLE NON-AMIGA SLIDES oh yes take that modplug you sack of crap
+- sample sustain loops!
+- fadeout! P.S. I HATE YOU XM AND I WANT YOU TO DIE FOREVER
+- stereo samples!
+- IT214 compressed samples!
+- *IT215* compressed samples!
+- ***STEREO*** compressed samples! (not extensively tested)
+- at least a half-assed attempt at implementing the Cvt flags properly!
+  - take that, everything that isn't IT! (how embarassing, would be so useful for zipping stuff up D:)
+- PERFECT* Ixx IMPLEMENTATION! (* i might be wrong - it passes the Storlek tests though)
+- correct instrument envelope looping! (none of this XM-y bollocks)
+
+and finally:
+- *PLENTY* of bugs!
+
+it doesn't quite have:
+- MMCMP decompression
+- all the effects
+- IT v1 volume envelopes (uses the points instead of the curve... but it sounds fine!)
+- SDx (well, it's there but it doesn't work properly)
+
+it lacks:
+- any form of input that isn't alt-f4, that X, or ctrl-c
+- any form of networking
+- non-.it loaders
+- a file saver
+- all the panes that aren't the pattern pane
+- embedded MIDI loading / timestamp crap
+- sample vibrato
+- vol/pan swing
+- duplicate check bollocks
+- VOLEFFECTS.
+
+it mostly needs:
+- a better mixing routine.
+
+seriously, commenting out the reso filter stuff does just about nothing.
+the main issue is with the looping code.
+
+personally i'd like to get some loop unrolling going on somewhere,
+  but susloops will make it a tad fiddly.
+
+with that said, it also needs a bit of decoupling wrt PatternChannel
+(should ideally be split into PatternChannel and VirtualChannel).
+
+so uh yeah, this is where it's at (or more likely where it WAS at, and I haven't updated this yet).
+--Ben "GreaseMonkey" Russell, 2012.

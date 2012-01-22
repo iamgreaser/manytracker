@@ -1,0 +1,578 @@
+package player;
+
+import session.*;
+
+import javax.sound.sampled.*;
+
+public class Player
+{
+	private static final int BUFLEN = 4096;
+	
+	private Session session;
+	
+	// playback info
+	private PlayerChannel[] chns = new PlayerChannel[80]; {
+		for(int i = 0; i < chns.length; i++)
+			chns[i] = new PlayerChannel(this);
+	}
+	
+	private int[] chnalloc = new int[64]; {
+		for(int i = 0; i < 64; i++)
+			// ordered this way just so i don't get complacent
+			//  - i've got to squeeze NNAs in there SOME time!
+			//     --GM
+			chnalloc[i] = 63-i;
+	}
+	
+	private boolean playing = false;
+	private boolean sequencing = false;
+	private boolean patlock = false;
+	
+	private int speed = 6;
+	private int tempo = 125;
+	private int gvol = 128;
+	
+	private int itversion = 0x0217;
+	// backwards compatibility.
+	// we're the only guys that can at least pretend to be bothered.
+	
+	private int curord = -1;
+	private SessionPattern curpat = null;
+	private int currow = -2, procrow = -2, breakrow = 0;
+	private int tickctr = 1;
+	private int rowctr = 1;
+	private boolean rowctr_set = false;
+	
+	private int base_freq = 44100;
+	private int[] fbuf_trk = new int[5];
+	private float[][] mixbuf = new float[2][BUFLEN];
+	private byte[] mixbuf_final = new byte[BUFLEN*4];
+	
+	private float mixoffs1 = 0.0f, mixoffs2 = 0.0f;
+	private float mixoffs_spd = calcMixOffsetSpeed();
+	
+	private AudioFormat afmt = null;
+	private SourceDataLine aufp = null;
+	
+	public Player(Session session)
+	{
+		this.session = session;
+		
+		openSound();
+	}
+	
+	public void setSession(Session session)
+	{
+		// TODO: any necessary locks
+		this.session = session;
+	}
+	
+	private void openSound()
+	{
+		try
+		{
+			afmt = new AudioFormat((float)base_freq, 16, 2, true, false);
+			aufp = AudioSystem.getSourceDataLine(afmt);
+			aufp.open(afmt);
+			aufp.start();
+			System.out.println("Sound started!");
+		} catch(Exception ex) {
+			// TODO: handle this more cleanly
+			throw new RuntimeException(ex);
+		}
+	}
+	
+	public void resetPlayback()
+	{
+		for(int i = 0; i < chns.length; i++)
+			chns[i].reset();
+		
+		playing = false;
+		sequencing = false;
+		patlock = false;
+		
+		tempo = session.getTempo();
+		speed = session.getSpeed();
+		gvol = session.getGlobalVolume();
+		itversion = session.getITVersion();
+		//itversion = 0x217; // TEST: IT 2.14p5 (the only version people care about)
+		//itversion = 0x209; // TEST: IT 2.09 (plenty of fun bugs)
+		//itversion = 0x206; // TEST: IT 2.06 (two versions before voleffects (I DON'T HAVE 2.07!))
+		
+		for(int i = 0; i < 64; i++)
+		{
+			chns[chnalloc[i]].setChannelVolume(session.getChannelVolume(i));
+			chns[chnalloc[i]].setChannelPanning(session.getChannelPanning(i));
+		}
+		
+		curord = -1;
+		curpat = null;
+		currow = -2; procrow = -2; breakrow = 0;
+		tickctr = 1;
+		rowctr = 1;
+	}
+	
+	public void playFromStart()
+	{
+		resetPlayback();
+		sequencing = true;
+		playing = true;
+	}
+	
+	private void writeMix(byte[] b, int offs, int len)
+	{
+		aufp.write(b, offs, len*4);
+	}
+	
+	private void doMix(float[][] f, byte[] b, int offs, int len)
+	{
+		int end = offs + len;
+		
+		for(int i = offs; i < end; i++)
+			//f[0][i] = f[1][i] = ((0.005f*(float)i) % 1.0f) * 2.0f - 1.0f;
+			f[0][i] = f[1][i] = 0.0f;
+		
+		for(int i = 0; i < chns.length; i++)
+			chns[i].mix(f, offs, len);
+		
+		float svol = (float)(gvol * session.getMixingVolume())/(1<<(7+7));
+		
+		svol *= 0.4f;
+		
+		for(int i = offs, j = offs*4; i < end; i++)
+		{
+			float fv1 = f[0][i] * svol;
+			float fv2 = f[1][i] * svol;
+			
+			if(fv1 - mixoffs1 > 1.0f)
+			{
+				mixoffs1 = fv1 - 1.0f;
+				//fv1 = 1.0f;
+			}
+			
+			if(fv1 - mixoffs1 < -1.0f)
+			{
+				mixoffs1 = fv1 + 1.0f;
+				//fv1 = -1.0f;
+			}
+			
+			if(fv2 - mixoffs2 > 1.0f)
+			{
+				mixoffs2 = fv2 - 1.0f;
+				//fv2 = 1.0f;
+			}
+			
+			if(fv2 - mixoffs2 < -1.0f)
+			{
+				mixoffs2 = fv2 + 1.0f;
+				//fv2 = -1.0f;
+			}
+			
+			/*
+			if(fv1 > 1.0f)
+				fv1 = 1.0f;
+			if(fv1 < -1.0f)
+				fv1 = -1.0f;
+			if(fv2 > 1.0f)
+				fv2 = 1.0f;
+			if(fv2 < -1.0f)
+				fv2 = -1.0f;
+			*/
+			
+			int v1 = (int)((fv1 - mixoffs1)*32767.0f);
+			int v2 = (int)((fv2 - mixoffs2)*32767.0f);
+			
+			// little-endian because i can --GM
+			b[j++] = (byte)(v1&255);
+			b[j++] = (byte)((v1>>8)&255);
+			b[j++] = (byte)(v2&255);
+			b[j++] = (byte)((v2>>8)&255);
+			
+			if(mixoffs1 > 0.0f)
+			{
+				mixoffs1 -= mixoffs_spd;
+				if(mixoffs1 < 0.0f)
+					mixoffs1 = 0.0f;
+			} else {
+				mixoffs1 += mixoffs_spd;
+				if(mixoffs1 > 0.0f)
+					mixoffs1 = 0.0f;
+			}
+			
+			if(mixoffs2 > 0.0f)
+			{
+				mixoffs2 -= mixoffs_spd;
+				if(mixoffs2 < 0.0f)
+					mixoffs2 = 0.0f;
+			} else {
+				mixoffs2 += mixoffs_spd;
+				if(mixoffs2 > 0.0f)
+					mixoffs2 = 0.0f;
+			}
+		}
+	}
+	
+	private float calcMixOffsetSpeed()
+	{
+		return (float)(1.0 / (base_freq*10.0));
+	}
+	
+	public void tick()
+	{
+		if(!playing)
+			return;
+		
+		tickData();
+		
+		int len = (int)((getFreq() * 5.0f) / (tempo * 2.0f));
+		//System.out.printf("len %d\n", len);
+		while(len > BUFLEN)
+		{
+			doMix(mixbuf, mixbuf_final, 0, BUFLEN);
+			writeMix(mixbuf_final, 0, BUFLEN);
+			len -= BUFLEN;
+		}
+		
+		doMix(mixbuf, mixbuf_final, 0, len);
+		writeMix(mixbuf_final, 0, len);
+	}
+	
+	private void tickData()
+	{
+		if(!sequencing)
+			return;
+		
+		// general flow as given in ITTECH.TXT.
+		// NOT DEVIATING FROM IT (though some values may change).
+		
+		// Set note volume to volume set for each channel
+		// Set note frequency to frequency set for each channel
+		for(int i = 0; i < chns.length; i++)
+			chns[i].calcOutputVolFreq();
+		
+		// Decrease tick counter
+		// Is tick counter 0 ?
+		
+		if(--tickctr <= 0)
+		{
+			// Yes
+			// Tick counter = Tick counter set (the current 'speed')
+			tickctr = speed;
+			
+			// Decrease Row counter.
+			// Is row counter 0?
+			if(--rowctr <= 0)
+			{
+				// Yes
+				// Row counter = 1
+				rowctr = 1;
+				rowctr_set = false;
+				
+				System.out.printf("O=%03d R=%03d\n", curord, currow);
+				
+				int rows = (curpat == null ? 64 : curpat.getRows());
+				
+				// XXX: probably not quite how it goes,
+				// but at least the SBx / Cxx quirk works
+				if(procrow == -3)
+				{
+					procrow = breakrow;
+					breakrow = 0;
+				}
+				
+				// Increase ProcessRow
+				// Is ProcessRow > NumberOfRows?
+				if(++procrow >= rows || procrow < 0)
+				{
+					// Yes
+					
+					// not going to bother c/p'ing this part
+					procrow = breakrow;
+					breakrow = 0;
+					nextOrder();
+					rows = (curpat == null ? 64 : curpat.getRows());
+					
+					// FIXME: work out what it does when procrow is out of range.
+					// going to assume this...
+					if(procrow >= rows || procrow < 0)
+						procrow = 0;
+					
+				} // (otherwise: No)
+				
+				// CurrentRow = ProcessRow
+				currow = procrow;
+				
+				// Update Pattern Variables (includes jumping to
+				// the appropriate row if requried and getting
+				// the NumberOfRows for the pattern)
+				
+				fbuf_trk[0] = 253;
+				fbuf_trk[1] = 0;
+				fbuf_trk[2] = 255;
+				fbuf_trk[3] = 0;
+				fbuf_trk[4] = 0;
+				
+				for(int c = 0; c < 64; c++)
+				{
+					if(curpat != null)
+					{
+						SessionTrack trk = curpat.getTrack(c);
+						if(trk != null)
+							trk.getData(currow, fbuf_trk);
+						else {
+							fbuf_trk[0] = 253;
+							fbuf_trk[1] = 0;
+							fbuf_trk[2] = 255;
+							fbuf_trk[3] = 0;
+							fbuf_trk[4] = 0;
+						}
+					}
+					
+					chns[chnalloc[c]].update0(
+						fbuf_trk[0],
+						fbuf_trk[1],
+						fbuf_trk[2],
+						fbuf_trk[3],
+						fbuf_trk[4]);
+				}
+			} else {
+				// No
+				// Call update-effects for each channel.
+				for(int c = 0; c < 64; c++)
+					chns[chnalloc[c]].updateN();
+			}
+		} else {
+			// No
+			// Update effects for each channel as required.
+			for(int c = 0; c < 64; c++)
+				chns[chnalloc[c]].updateN();
+		}
+		
+		// Instrument mode?
+		if((session.getFlags() & Session.FLAG_INSMODE) != 0)
+		{
+			// Yes
+			// Update Envelopes as required
+			// Update fadeout as required
+			for(int c = 0; c < chns.length; c++)
+				chns[c].updateEnvelopes();
+		}
+		
+		// and the rest is done in mix().
+	}
+	
+	public PlayerChannel allocateNNA()
+	{
+		// using pre-2.03 NNA allocation as 2.03+ isn't documented
+		
+		/*
+		notes on this:
+		
+		2.03:
+		absolutely nothing.
+		first ITTECH.DOC/TXT to mention this change was 2.08's
+		(or 2.07's, but I don't have that so I can't know right now).
+		
+		2.08:
+		- Player Improvement: NNA mechanism will eliminate channels on two extra
+		  conditions now (no difference to playback, but should
+		  maximise channel usage)
+		*/
+		
+		// check for stopped channels
+		for(int i = 64; i < chns.length; i++)
+			if(!chns[i].isActive())
+				return chns[i];
+		
+		// choose quietest backgrounded channel
+		float quietest_vol = 0.0f;
+		int quietest_idx = -1;
+		
+		for(int i = 64; i < chns.length; i++)
+		{
+			if(!chns[i].isForeground())
+			{
+				float cvol = chns[i].getCalculatedVol();
+				if(quietest_idx == -1 || cvol < quietest_vol)
+				{
+					quietest_idx = i;
+					quietest_vol = cvol;
+				}
+			}
+		}
+		
+		return quietest_idx == -1
+			? null
+			: chns[quietest_idx]
+				;
+	}
+	
+	private void nextOrder()
+	{
+		curord++;
+		while(session.getOrder(curord) == 254)
+			curord++;
+		if(session.getOrder(curord) == 255)
+			curord = 0;
+		
+		// not mentioned but i'm pretty sure it does this.
+		while(session.getOrder(curord) == 254)
+			curord++;
+		
+		// not looping around again.
+		curpat = session.getPattern(session.getOrder(curord));
+	}
+	
+	// byte 0: note, byte 1: instrument
+	public int getSampleAndNote(int ins, int note)
+	{
+		return session.getSampleAndNote(ins, note);
+	}
+	
+	// getters
+	
+	public SessionSample getSample(int idx)
+	{
+		return session.getSample(idx);
+	}
+	
+	public SessionInstrument getInstrument(int idx)
+	{
+		return (session.getFlags() & Session.FLAG_INSMODE) != 0
+			? session.getInstrument(idx)
+			: null
+				;
+	}
+	
+	public int getITVersion()
+	{
+		return itversion;
+	}
+	
+	public int getRow()
+	{
+		return currow;
+	}
+	
+	public double getFreq()
+	{
+		return (double)base_freq;
+	}
+	
+	public boolean useInstruments()
+	{
+		return (session.getFlags() & Session.FLAG_INSMODE) != 0;
+	}
+	
+	public boolean hasStereo()
+	{
+		return (session.getFlags() & Session.FLAG_STEREO) != 0;
+	}
+	
+	public boolean hasCompatGxx()
+	{
+		// jeff forgot to mention this flag in the IT 2.09 changelog.
+		// it got a mention as an addition to the "Old Effects" command in IT 2.08,
+		// but was silently moved to its own category in IT 2.09.
+		// (ITTECH.DOC mentioned it, though.)
+		//   --GM
+		return (
+			(itversion >= 0x209 && (session.getFlags() & Session.FLAG_COMPATGXX) != 0)
+			|| (itversion == 0x208 && hasOldEffects())
+				);
+	}
+	
+	public boolean hasOldEffects()
+	{
+		return itversion >= 0x106 && (session.getFlags() & Session.FLAG_OLDEFFECTS) != 0;
+	}
+	
+	public boolean hasLinearSlides()
+	{
+		return (session.getFlags() & Session.FLAG_LINEAR) != 0;
+	}
+	
+	// setters
+	
+	public void setSpeed(int speed)
+	{
+		this.tickctr = this.speed = speed;
+	}
+	
+	public void addSpeed(int amt)
+	{
+		this.tickctr += amt;
+	}
+	
+	public void setTempo(int tempo)
+	{
+		this.tempo = tempo;
+	}
+	
+	public void addTempo(int amt)
+	{
+		this.tempo += amt;
+		if(this.tempo < 32)
+			this.tempo = 32;
+		if(this.tempo > 255)
+			this.tempo = 255;
+	}
+	
+	public void setGlobalVolume(int vol)
+	{
+		this.gvol = vol;
+	}
+	
+	public void addGlobalVolume(int amt)
+	{
+		this.gvol += amt;
+		if(this.gvol < 0)
+			this.gvol = 0;
+		if(this.gvol > 128)
+			this.gvol = itversion < 0x106 ? 0 : 128; // anyone for dubstep? --GM
+	}
+	
+	public void setOrderDeferred(int ord)
+	{
+		// Bxx, SBx = wait for loopback to finish
+		// SBx, Bxx = who cares about loopback?
+		procrow = -2;
+		curord = ord-1;
+	}
+	
+	public void breakRowDeferred(int row)
+	{
+		// Cxx, SBx = wait for loopback to finish
+		// SBx, Cxx = wait for loopback to finish <-- HEY STORLEK FIX THIS
+		
+		// there's a check SOMEWHERE here...
+		// WHERE THE HELL IS v2.00
+		// THIS CHANGE ISN'T DOCUMENTED IN THE CHANGELOG
+		// SO I CAN'T PINPOINT THIS VERY WELL
+		if(procrow == -3 && itversion >= 0x0200)
+			return;
+		
+		procrow = -2;
+		breakrow = row-1;
+	}
+	
+	public void setRowCounter(int rowctr)
+	{
+		if(rowctr_set)
+			return;
+		
+		this.rowctr_set = true;
+		this.rowctr = rowctr;
+	}
+	
+	public void setProcRow(int row)
+	{
+		procrow = -3;
+		breakrow = row;
+	}
+	
+	public int getOrder()
+	{
+		return curord;
+	}
+}
