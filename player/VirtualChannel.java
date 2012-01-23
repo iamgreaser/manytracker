@@ -110,6 +110,7 @@ public class VirtualChannel
 		filt_import = 127;
 		filt_env = 64;
 		filt_res = 0;
+		filt_needs_calc = true;
 		
 		filt_k1l = 0.0f;
 		filt_k2l = 0.0f;

@@ -60,3 +60,6 @@ with that said, it also needs a bit of decoupling wrt PatternChannel
 
 so uh yeah, this is where it's at (or more likely where it WAS at, and I haven't updated this yet).
 --Ben "GreaseMonkey" Russell, 2012.
+
+to make a jar:
+jar -cf manytracker.jar -m META-INF/MANIFEST.MF */*.class >/dev/null
