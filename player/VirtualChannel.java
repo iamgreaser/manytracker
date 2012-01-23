@@ -156,13 +156,6 @@ public class VirtualChannel
 			return;
 		
 		doMix(buf, offs, len);
-		// TODO: ensure vol0 mix optimisations (heh) works properly
-		/*
-		if(mixing)
-			doMix(buf, offs, len);
-		else
-			doFix(len);
-		*/
 	}
 	
 	public void updateEnvelopes()
@@ -338,8 +331,13 @@ public class VirtualChannel
 		
 		try
 		{
-			if(NO_FILTERS || ((!DEBUG_TORTURE_CPU) && fa == 1.0f))// && fb == 0.0f && fc == 0.0f)
+			if(base_vol == 0.0f)
 			{
+				// vol0 optimisation
+				suboffs += base_spd * blen;
+				offs += suboffs>>13;
+				suboffs &= (1<<13)-1;
+			} else if(NO_FILTERS || ((!DEBUG_TORTURE_CPU) && fa == 1.0f && fb == 0.0f && fc == 0.0f)) {
 				// stereo sample mix
 				for(int i = boffs; i < end; i++)
 				{
@@ -350,7 +348,7 @@ public class VirtualChannel
 					offs += suboffs>>13;
 					suboffs &= (1<<13)-1;
 				}	
-			} else if(dl == dr) {
+			} else if((csmp.getFlags() & SessionSample.SFLG_STEREO) == 0) {
 				// mono sample filter mix
 				for(int i = boffs; i < end; i++)
 				{
@@ -414,61 +412,6 @@ public class VirtualChannel
 		} else {
 			if(offs >= length)
 				active = false;
-		}
-	}
-	
-	private void doFix(int len)
-	{
-		// if "mixing" is false, calculate next part
-		float[][] data = note_off ? csmp.getDataLoop() : csmp.getDataSustain();
-		int length = data[0].length;
-		
-		// get time
-		double time = ((double)len)/player.getFreq();
-		
-		// move sample stuff across
-		suboffs += time;
-		offs += (reverse ? -1 : 1) * (int)suboffs;
-		suboffs %= 1.0f;
-		
-		// flip if reversed too far left
-		if(offs < 0)
-		{
-			offs = -offs;
-			reverse = false;
-		}
-		
-		// XXX: NEEDS LOTS OF TESTING!
-		
-		// check if looping
-		if(looping)
-		{
-			// check if ping-pong
-			if(pingpong)
-			{
-				// check if gone over end
-				if(offs >= curlpbeg+curlplen)
-				{
-					// adjust for loop
-					offs -= curlpbeg;
-					reverse = offs > curlplen;
-					offs += curlpbeg;
-				}
-			} else {
-				// check if gone over end
-				if(offs >= curlpbeg+curlplen)
-				{
-					// adjust for loop
-					offs = (offs - curlpbeg) % curlplen + curlpbeg;
-				}
-			}
-		} else {
-			// check end of sample
-			if(offs >= length)
-			{
-				// kill the sample
-				active = false;
-			}
 		}
 	}
 	
