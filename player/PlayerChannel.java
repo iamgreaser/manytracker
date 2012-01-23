@@ -809,8 +809,7 @@ public class PlayerChannel
 		if(nvchn != null)
 		{
 			nvchn.reset();
-			if(vchn != null)
-				nvchn.enslave(this, vchn);
+			nvchn.enslave(this, vchn);
 			nvchn.changeSample(csmp);
 			nvchn.changeInstrument(cins);
 		}

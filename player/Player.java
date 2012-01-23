@@ -16,7 +16,8 @@ public class Player
 			chns[i] = new PlayerChannel(this);
 	}
 	
-	private VirtualChannel[] vchns = new VirtualChannel[128]; {
+	private VirtualChannel[] vchns = new VirtualChannel[64]; {
+		// TODO speed up the reso filter mixer
 		for(int i = 0; i < vchns.length; i++)
 			vchns[i] = new VirtualChannel(this);
 	}
@@ -136,6 +137,7 @@ public class Player
 		
 		float svol = (float)(gvol * session.getMixingVolume())/(1<<(7+7));
 		
+		// TODO stick in a compressor just in case some egg decided to use modplug
 		svol *= 0.4f;
 		
 		for(int i = offs, j = offs*4; i < end; i++)

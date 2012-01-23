@@ -7,6 +7,8 @@ public class VirtualChannel
 	// flags
 	public static final boolean DEBUG_TORTURE_CPU = false;
 	public static final boolean NO_FILTERS = false;
+	public static final float FILTER_NAN_THRESHOLD = 0.99f;
+	
 	// playback info
 	private SessionSample csmp = null;
 	
@@ -124,7 +126,9 @@ public class VirtualChannel
 		if(nextSlave != null)
 			nextSlave.prevSlave = other;
 		
-		other.foreground = false;
+		if(other != null)
+			other.foreground = false;
+		
 		foreground = true;
 		
 		nextSlave = other;
@@ -143,6 +147,7 @@ public class VirtualChannel
 		chn = null;
 		
 		foreground = false;
+		reset();
 	}
 	
 	public void mix(float[][] buf, int offs, int len)
@@ -243,9 +248,8 @@ public class VirtualChannel
 			filt_c = -e*filt_a;
 			
 			// XXX: attempt to de-NaN the code
-			//float tfc = fc/(fa*fb);
-			//if(fc < tfc)
-			//	fc = tfc;
+			if(filt_b < -FILTER_NAN_THRESHOLD)
+				filt_b = -FILTER_NAN_THRESHOLD;
 			
 			//System.out.printf("%f %f [%f, %f, %f / %f, %f]\n", filt_k1l, filt_k1r, fa, fb, fc, d, e);
 		}
@@ -336,6 +340,7 @@ public class VirtualChannel
 		{
 			if(NO_FILTERS || ((!DEBUG_TORTURE_CPU) && fa == 1.0f))// && fb == 0.0f && fc == 0.0f)
 			{
+				// stereo sample mix
 				for(int i = boffs; i < end; i++)
 				{
 					bufl[i] += dl[offs] * vol1;
@@ -345,7 +350,26 @@ public class VirtualChannel
 					offs += suboffs>>13;
 					suboffs &= (1<<13)-1;
 				}	
+			} else if(dl == dr) {
+				// mono sample filter mix
+				for(int i = boffs; i < end; i++)
+				{
+					float outl = dl[offs] * filt_a + filt_k1l * fb + filt_k2l * fc;
+					
+					bufl[i] += outl * vol1;
+					bufr[i] += outl * vol2;
+					
+					filt_k2l = filt_k1l;
+					filt_k1l = outl;
+					
+					suboffs += base_spd;
+					offs += suboffs>>13;
+					suboffs &= (1<<13)-1;
+				}
+				filt_k2r = filt_k2l;
+				filt_k1r = filt_k1l;
 			} else {
+				// stereo sample filter mix
 				vol1 *= filt_a;
 				vol2 *= filt_a;
 				
@@ -529,11 +553,9 @@ public class VirtualChannel
 	
 	public boolean imYoursRight(PlayerChannel chn)
 	{
-		// FIXME: stuff doesn't appear to deallocate properly OSLT
-		// currently going with older, more naive behaviour
-		// --GM
-		return true;
-		//return this.chn == chn;
+		// if it breaks again, use this line instead
+		//return true;
+		return this.chn == chn;
 	}
 	
 	// getters
