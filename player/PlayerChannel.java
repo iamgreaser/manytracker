@@ -4,6 +4,10 @@ import session.*;
 
 public class PlayerChannel
 {
+	public static final int[] GX_VALUE_LUT = {
+		1, 4, 8, 16, 32, 64, 96, 128, 255
+	};
+	
 	private Player player = null;
 	
 	// sample handle
@@ -65,11 +69,11 @@ public class PlayerChannel
 	private int eff_sax = 0;
 	private int eff_txx = 0;
 	private int eff_wxx = 0;
-	private int eff_vabcdx = 0;
-	private int eff_vefx = 0;
-	private int eff_vgx = 0;
-	private int eff_vhx = 0;
+	private int eff_vs = 0;
 	
+	private int eff_dxx_slide = 0;
+	private int eff_efxx_slide = 0;
+	private int eff_gxx_slide = 0;
 	private boolean eff_hxx_fine = false;
 	private int eff_hxx_offs = 0;
 	private int eff_ixx_tickdown = 0;
@@ -127,6 +131,18 @@ public class PlayerChannel
 			return -(mask&15);
 		else
 			return 0; // TODO: work out any other weirdness
+	}
+	
+	private void doVolSlideEff(int v, boolean down)
+	{
+		vol_note += (down ? -v : v);
+		
+		if(vol_note < 0)
+			vol_note = 0;
+		if(vol_note > 64)
+			vol_note = 64;
+		
+		vol_out = vol_note;
 	}
 	
 	private void doVolSlide(int mask)
@@ -286,6 +302,18 @@ public class PlayerChannel
 			per_note = player.calcSlide16(per_note, mask*mul);
 	}
 	
+	private void doSlideEff(int mask, boolean down)
+	{
+		// no "zone" here!
+		int mul = down ? -1 : 1;
+		
+		// fun bug in IT 2.08-2.09
+		if(player.getITVersion() < 0x210)
+			per_note = per_out;
+	
+		per_note = player.calcSlide16(per_note, mask*mul);
+	}
+	
 	private double getWaveform(int type, int offs)
 	{
 		// TODO: types that aren't 0
@@ -308,6 +336,8 @@ public class PlayerChannel
 		} else {
 			eff_hxx_offs += (mask>>2) & 0x3C;
 		}
+		
+		eff_hxx_offs &= 0xFF;
 		
 		//System.out.printf("vib %.3f\n", amp);
 		
@@ -392,6 +422,8 @@ public class PlayerChannel
 				if(efp != 0)
 					eff_dxx = efp;
 				
+				eff_dxx_slide = eff_dxx;
+				
 				if(checkVolSlide0(eff_dxx))
 					doVolSlide(eff_dxx);
 				
@@ -408,6 +440,8 @@ public class PlayerChannel
 						eff_gxx = efp;
 				}
 				
+				eff_efxx_slide = eff_efxx;
+				
 				doSlide(eff_efxx, pat_eft == 0x05, true);
 				
 				break;
@@ -418,6 +452,8 @@ public class PlayerChannel
 					if(!player.hasCompatGxx())
 						eff_efxx = efp;
 				}
+				
+				eff_gxx_slide = eff_gxx;
 				
 				break;
 			
@@ -636,12 +672,92 @@ public class PlayerChannel
 		{
 			vol_out = vol_note = vol;
 			//System.out.printf("volume %d\n", vol);
-		} else if(vol >= 128 && vol <= 192) {
+		} else if(vol >= 128 && vol <= (player.getITVersion() < 0x208 ? 255 : 192)) {
 			pan_chn = vol-128;
 			// TODO: check IT pre 2.08 on how this behaves out of range
-		} else if(vol < 74) {
+		} else if(vol < 75) {
+			// Ax fine vol slide up
+			if(vol != 65)
+				eff_vs = vol-65;
 			
-		}
+			doVolSlideEff(eff_vs, false);
+			/*if(vol != 65)
+				eff_dxx = ((vol-65)<<4)|0x0F;
+			
+			if(checkVolSlide0(eff_dxx))
+				doVolSlide(eff_dxx);*/
+		} else if(vol < 85) {
+			// Bx fine vol slide down
+			if(vol != 75)
+				eff_vs = vol-75;
+			
+			doVolSlideEff(eff_vs, true);
+			/*
+			if(vol != 75)
+				eff_dxx = (vol-75)|0xF0;
+			
+			if(checkVolSlide0(eff_dxx))
+				doVolSlide(eff_dxx);*/
+		} else if(vol < 95) {
+			// Cx fine vol slide up
+			if(vol != 85)
+				eff_vs = vol-85;
+			/*
+			if(vol != 85)
+				eff_dxx = ((vol-85)<<4);
+			
+			if(checkVolSlide0(eff_dxx))
+				doVolSlide(eff_dxx);*/
+		} else if(vol < 105) {
+			// Dx fine vol slide down
+			if(vol != 95)
+				eff_vs = vol-95;
+			/*
+			if(vol != 95)
+				eff_dxx = (vol-95);
+			
+			if(checkVolSlide0(eff_dxx))
+				doVolSlide(eff_dxx);*/
+		} else if(vol < 115) {
+			// Ex slide down
+			
+			if(vol != 105)
+			{
+				eff_efxx = (vol-105)*4;
+				
+				if(!player.hasCompatGxx())
+					eff_gxx = eff_efxx;
+			}
+			
+			doSlide(eff_efxx, true, true);
+		} else if(vol < 125) {
+			// Fx slide up
+			
+			if(vol != 115)
+			{
+				eff_efxx = (vol-115)*4;
+				
+				if(!player.hasCompatGxx())
+					eff_gxx = eff_efxx;
+			}
+			
+			doSlide(eff_efxx, false, true);
+		} else if(vol < 128) {
+			// NOTHING
+		} else if(vol < 203) {
+			// Gx portamento
+			
+			if(vol != 193)
+			{
+				eff_gxx = GX_VALUE_LUT[vol-194];
+				if(!player.hasCompatGxx())
+					eff_efxx = efp;
+			}
+		} else if(vol < 213) {
+			// Hx vibrato
+			
+			// TODO!
+		} 
 		
 		boolean porta_test_root = (pat_eft != 0x07 && pat_eft != 0x0C);
 		boolean porta_test = (isActive() || porta_test_root);
@@ -859,22 +975,22 @@ public class PlayerChannel
 		switch(pat_eft)
 		{
 			case 0x04: // Dxy - volume slide
-				if(checkVolSlideN(eff_dxx))
-					doVolSlide(eff_dxx);
+				if(checkVolSlideN(eff_dxx_slide))
+					doVolSlide(eff_dxx_slide);
 				
 				break;
 			
 			case 0x0B: // Kxy - H00 + Dxy
-				if(checkVolSlideN(eff_dxx))
-					doVolSlide(eff_dxx);
+				if(checkVolSlideN(eff_dxx_slide))
+					doVolSlide(eff_dxx_slide);
 				
 				doVibrato(eff_hxx, eff_hxx_fine);
 				
 				break;
 			
 			case 0x0C: // Lxy - G00 + Dxy
-				if(checkVolSlideN(eff_dxx))
-					doVolSlide(eff_dxx);
+				if(checkVolSlideN(eff_dxx_slide))
+					doVolSlide(eff_dxx_slide);
 				
 				doPorta(eff_gxx);
 				
@@ -882,12 +998,12 @@ public class PlayerChannel
 			
 			case 0x05: // Exx - slide down
 			case 0x06: // Fxx - slide up
-				doSlide(eff_efxx, pat_eft == 0x05, false);
+				doSlide(eff_efxx_slide, pat_eft == 0x05, false);
 				
 				break;
 			
 			case 0x07: // Gxx - portamento
-				doPorta(eff_gxx);
+				doPorta(eff_gxx_slide);
 				
 				break;
 			
@@ -941,6 +1057,45 @@ public class PlayerChannel
 				if(checkVolSlideN(eff_wxx))
 					player.addGlobalVolume(calcVolSlide(eff_wxx));
 				break;
+		}
+		
+		if(pat_vol <= (player.getITVersion() < 0x208 ? 127 : 64))
+		{
+			// NOTHING!
+		} else if(pat_vol < 85) {
+			// Ax fine vol slide up
+			// Bx fine vol slide down
+			// NOTHING!
+		} else if(pat_vol < 95) {
+			// Cx fine vol slide up
+			doVolSlideEff(eff_vs, false);
+		} else if(pat_vol < 105) {
+			// Dx fine vol slide down
+			doVolSlideEff(eff_vs, true);
+			/*
+			if(checkVolSlideN(eff_dxx))
+				doVolSlide(eff_dxx);*/
+		} else if(pat_vol < 115) {
+			// Ex slide down
+			
+			doSlideEff(eff_efxx, true);
+		} else if(pat_vol < 125) {
+			// Fx slide up
+			
+			doSlideEff(eff_efxx, false);
+		} else if(pat_vol <= (player.getITVersion() < 0x208 ? 255 : 192)) {
+			// NOTHING!
+		} else if(pat_vol < 203) {
+			// Gx portamento
+			
+			// fun bug in IT 2.08-2.09
+			if(player.getITVersion() < 0x210)
+				per_note = per_out;
+			
+			doPorta(eff_gxx);
+		} else if(pat_vol < 213) {
+			// Hx vibrato
+			// TODO!
 		}
 	}
 	
