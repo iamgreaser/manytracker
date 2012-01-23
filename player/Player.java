@@ -11,17 +11,14 @@ public class Player
 	private Session session;
 	
 	// playback info
-	private PlayerChannel[] chns = new PlayerChannel[80]; {
+	private PlayerChannel[] chns = new PlayerChannel[64]; {
 		for(int i = 0; i < chns.length; i++)
 			chns[i] = new PlayerChannel(this);
 	}
 	
-	private int[] chnalloc = new int[64]; {
-		for(int i = 0; i < 64; i++)
-			// ordered this way just so i don't get complacent
-			//  - i've got to squeeze NNAs in there SOME time!
-			//     --GM
-			chnalloc[i] = 63-i;
+	private VirtualChannel[] vchns = new VirtualChannel[128]; {
+		for(int i = 0; i < vchns.length; i++)
+			vchns[i] = new VirtualChannel(this);
 	}
 	
 	private boolean playing = false;
@@ -86,6 +83,8 @@ public class Player
 	{
 		for(int i = 0; i < chns.length; i++)
 			chns[i].reset();
+		for(int i = 0; i < vchns.length; i++)
+			vchns[i].reset();
 		
 		playing = false;
 		sequencing = false;
@@ -101,8 +100,8 @@ public class Player
 		
 		for(int i = 0; i < 64; i++)
 		{
-			chns[chnalloc[i]].setChannelVolume(session.getChannelVolume(i));
-			chns[chnalloc[i]].setChannelPanning(session.getChannelPanning(i));
+			chns[i].setChannelVolume(session.getChannelVolume(i));
+			chns[i].setChannelPanning(session.getChannelPanning(i));
 		}
 		
 		curord = -1;
@@ -132,8 +131,8 @@ public class Player
 			//f[0][i] = f[1][i] = ((0.005f*(float)i) % 1.0f) * 2.0f - 1.0f;
 			f[0][i] = f[1][i] = 0.0f;
 		
-		for(int i = 0; i < chns.length; i++)
-			chns[i].mix(f, offs, len);
+		for(int i = 0; i < vchns.length; i++)
+			vchns[i].mix(f, offs, len);
 		
 		float svol = (float)(gvol * session.getMixingVolume())/(1<<(7+7));
 		
@@ -215,6 +214,35 @@ public class Player
 	private float calcMixOffsetSpeed()
 	{
 		return (float)(1.0 / (base_freq*10.0));
+	}
+	
+	public int calcSlide1(int base, int amt)
+	{
+		return (int)(0.5 + base * Math.pow(2.0f, amt / 12.0f));
+	}
+	
+	public int calcSlide2(int base, int amt)
+	{
+		return (int)(0.5 + base * Math.pow(2.0f, amt / (2.0f * 12.0f)));
+	}
+	
+	public int calcSlide16(int base, int amt)
+	{
+		return calcSlide64(base, amt*4);
+	}
+	
+	public int calcSlide64(int base, int amt)
+	{
+		if(hasLinearSlides())
+			return (int)(0.5 + base * Math.pow(2.0f, amt / (64.0f * 12.0f)));
+		else {
+			int amiclk = 8363*428*4;
+			
+			int oper = amiclk / base;
+			int nper = oper - amt;
+			
+			return amiclk / nper;
+		}
 	}
 	
 	public void tick()
@@ -328,7 +356,7 @@ public class Player
 						}
 					}
 					
-					chns[chnalloc[c]].update0(
+					chns[c].update0(
 						fbuf_trk[0],
 						fbuf_trk[1],
 						fbuf_trk[2],
@@ -339,14 +367,19 @@ public class Player
 				// No
 				// Call update-effects for each channel.
 				for(int c = 0; c < 64; c++)
-					chns[chnalloc[c]].updateN();
+					chns[c].updateN();
 			}
 		} else {
 			// No
 			// Update effects for each channel as required.
 			for(int c = 0; c < 64; c++)
-				chns[chnalloc[c]].updateN();
+				chns[c].updateN();
 		}
+		
+		// ok, this isn't denoted in ITTECH,TXT but "were making this hapen"
+		// update the virtual channels.
+		for(int c = 0; c < 64; c++)
+			chns[c].updateVirtualChannel();
 		
 		// Instrument mode?
 		if((session.getFlags() & Session.FLAG_INSMODE) != 0)
@@ -354,14 +387,14 @@ public class Player
 			// Yes
 			// Update Envelopes as required
 			// Update fadeout as required
-			for(int c = 0; c < chns.length; c++)
-				chns[c].updateEnvelopes();
+			for(int c = 0; c < vchns.length; c++)
+				vchns[c].updateEnvelopes();
 		}
 		
 		// and the rest is done in mix().
 	}
 	
-	public PlayerChannel allocateNNA()
+	public VirtualChannel allocateVirtualChannel()
 	{
 		// using pre-2.03 NNA allocation as 2.03+ isn't documented
 		
@@ -380,19 +413,19 @@ public class Player
 		*/
 		
 		// check for stopped channels
-		for(int i = 64; i < chns.length; i++)
-			if(!chns[i].isActive())
-				return chns[i];
+		for(int i = 0; i < vchns.length; i++)
+			if(!vchns[i].isActive())
+				return vchns[i];
 		
 		// choose quietest backgrounded channel
 		float quietest_vol = 0.0f;
 		int quietest_idx = -1;
 		
-		for(int i = 64; i < chns.length; i++)
+		for(int i = 0; i < vchns.length; i++)
 		{
-			if(!chns[i].isForeground())
+			if(!vchns[i].isForeground())
 			{
-				float cvol = chns[i].getCalculatedVol();
+				float cvol = vchns[i].getCalculatedVol();
 				if(quietest_idx == -1 || cvol < quietest_vol)
 				{
 					quietest_idx = i;
@@ -403,7 +436,7 @@ public class Player
 		
 		return quietest_idx == -1
 			? null
-			: chns[quietest_idx]
+			: vchns[quietest_idx]
 				;
 	}
 	

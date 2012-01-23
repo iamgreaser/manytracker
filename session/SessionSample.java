@@ -42,6 +42,8 @@ public class SessionSample
 	
 	// kinda necessary stuff
 	private float[][] data = null;
+	private float[][] dataSustain = null;
+	private float[][] dataLoop = null;
 	
 	public SessionSample(RandomAccessFile fp) throws IOException
 	{
@@ -95,6 +97,96 @@ public class SessionSample
 		} else {
 			this.data = null;
 		}
+		
+		unrollLoops();
+	}
+	
+	private void unrollLoops()
+	{
+		if(data == null)
+		{
+			dataLoop = data;
+			dataSustain = data;
+			return;
+		}
+		
+		dataLoop = unrollLoop(lpbeg, lplen, (flg & SFLG_LOOP) != 0, (flg & SFLG_BIDI) != 0);
+		if((flg & SFLG_SUSLOOP) != 0)
+			dataSustain = unrollLoop(susbeg, suslen, (flg & SFLG_SUSLOOP) != 0, (flg & SFLG_SUSBIDI) != 0);
+		else
+			dataSustain = dataLoop;
+	}
+	
+	private float[][] unrollLoop(int beg, int len, boolean loop, boolean pingpong)
+	{
+		// FEATURE SUGGESTION: this could possibly do some anticlick stuff --GM
+		
+		// some thresholds...
+		// TODO: not require such a huge mixSpill value
+		
+		if(!loop)
+		{
+			beg = this.length;
+			len = 1;
+		}
+		
+		int mixSpill = (c5speed<<6)*10/(32*4) + 100;
+		int loopSize = (loop ? (pingpong ? len*2-1 : len) : 1);
+		
+		// allocate
+		float[][] xdata = new float[2][beg + loopSize + mixSpill];
+		
+		// copy start
+		int p = 0;
+		for(int i = 0; i < beg; i++)
+		{
+			xdata[0][p] = data[0][i];
+			xdata[1][p++] = data[1][i];
+		}
+		
+		// copy loop if necessary
+		if(loop)
+		{
+			for(int i = 0; i < len; i++)
+			{
+				xdata[0][p] = data[0][i+beg];
+				xdata[1][p++] = data[1][i+beg];
+			}
+			
+			if(pingpong)
+			{
+				for(int i = len-2; i >= 0; i--)
+				{
+					xdata[0][p] = data[0][i+beg];
+					xdata[1][p++] = data[1][i+beg];
+				}
+			}
+		} else {
+			xdata[0][p] = 0.0f;
+			xdata[1][p++] = 0.0f;
+		}
+		
+		// unroll to end
+		while(p < xdata[0].length)
+		{
+			xdata[0][p] = xdata[0][p-loopSize];
+			xdata[1][p] = xdata[1][p-loopSize];
+			p++;
+		}
+		
+		// return
+		return xdata;
+	}
+	
+	public int transferLoopSustain(int offs)
+	{
+		// can't transfer if we don't have a sustain loop
+		if((flg & SFLG_SUSLOOP) == 0)
+			return offs;
+		
+		// TODO: do the transfer properly!
+		System.err.printf("TODO: transferLoopSustain where sustain loop actually exists");
+		return offs;
 	}
 	
 	private void loadSampleData(RandomAccessFile fp, float[] d) throws IOException
@@ -424,9 +516,14 @@ public class SessionSample
 	}
 	
 	// WARNING: DO NOT USE THIS AS A SUBSTITUTE FOR A POSSIBLE SETDATA() METHOD
-	public float[][] getData()
+	public float[][] getDataSustain()
 	{
-		return this.data;
+		return this.dataSustain;
+	}
+	
+	public float[][] getDataLoop()
+	{
+		return this.dataLoop;
 	}
 	
 	public int getGlobalVol()

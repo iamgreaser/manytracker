@@ -17,62 +17,39 @@ public class PlayerChannel
 	private int ins_idx = 0;
 	
 	// playback info
-	private boolean mixing = false;
-	private boolean active = false;
 	
-	private int offs = 0;
+	private VirtualChannel vchn = null;
+	
 	private int uoffs = 0;
-	private int suboffs = 0;
-	private boolean looping = false;
-	private boolean pingpong = false;
-	private boolean reverse = false;
-	
-	private SessionInstrument.Envelope.Handle env_vol = null;
-	private SessionInstrument.Envelope.Handle env_pan = null;
-	private SessionInstrument.Envelope.Handle env_per = null;
-	
-	private int curlplen = 0;
-	private int curlpbeg = 0;
 	
 	private int vol_glb = 64*128; // sample + instrument global volumes
 	private int vol_chn = 64;
 	private int vol_note = 64;
 	private int vol_out = 64;
-	private int vol_env = 64;
-	private int vol_fadeout = 1024;
 	
 	private float vol_calculated = 1.0f;
 	
 	private int pan_chn = 32;
-	private int pan_env = 32;
 	
-	private int per_note = 0;
-	private int per_targ = 0;
+	private int per_note = 8363;
+	private int per_targ = 8363;
 	private int per_targ_note = 0;
-	private int per_out = 0;
-	private int per_env = 32;
+	private int per_out = 8363;
 	
 	private int filt_chn = 127;
-	private int filt_env = 64;
 	private int filt_res = 0;
 	
-	private float filt_k1l = 0.0f;
-	private float filt_k2l = 0.0f;
-	private float filt_k1r = 0.0f;
-	private float filt_k2r = 0.0f;
-	
 	private int last_note = 253;
-	private boolean note_off = false;
-	private boolean note_fade = false;
-	
-	private PlayerChannel master = null;
-	private PlayerChannel slave = null;
 	
 	private int pat_note = 0;
 	private int pat_ins = 0;
 	private int pat_vol = 0;
 	private int pat_eft = 0;
 	private int pat_efp = 0;
+	
+	private SessionInstrument.Envelope.Handle env_vol = null;
+	private SessionInstrument.Envelope.Handle env_pan = null;
+	private SessionInstrument.Envelope.Handle env_per = null;
 	
 	// effect memory
 	
@@ -109,171 +86,15 @@ public class PlayerChannel
 	public PlayerChannel(Player player)
 	{
 		this.player = player;
+	
 	}
 	
 	public void reset()
 	{
-		// sample handle
-		csmp = null;
-		smp_idx = 0;
-		
-		// instrument handle
-		cins = null;
-		ins_idx = 0;
-		
-		// playback info
-		mixing = false;
-		active = false;
-		
-		offs = 0;
-		uoffs = 0;
-		suboffs = 0;
-		looping = false;
-		pingpong = false;
-		reverse = false;
-		
-		env_vol = null;
-		env_pan = null;
-		env_per = null;
-		
-		curlplen = 0;
-		curlpbeg = 0;
-		
-		vol_glb = 64*128; // sample + instrument global volumes
-		vol_chn = 64;
-		vol_note = 64;
-		vol_out = 64;
-		vol_env = 64;
-		vol_fadeout = 1024;
-		
-		pan_chn = 32;
-		pan_env = 32;
-		
-		per_note = 0;
-		per_targ = 0;
-		per_out = 0;
-		per_env = 32;
-		
-		filt_chn = 127;
-		filt_env = 64;
-		filt_res = 0;
-		
-		filt_k2l = filt_k1l = 0.0f;
-		filt_k2r = filt_k1r = 0.0f;
-		
-		last_note = 60;
-		note_off = false;
-		note_fade = false;
-		
-		master = null;
-		slave = null;
+		// TODO!
 	}
 	
 	// stuff
-	
-	private void loadSlave(PlayerChannel other)
-	{
-		// sample handle
-		other.csmp = csmp;
-		other.smp_idx = smp_idx;
-		
-		// instrument handle
-		other.cins = cins;
-		other.ins_idx = ins_idx;
-		
-		// playback info
-		other.mixing = mixing;
-		other.active = active;
-		
-		other.offs = offs;
-		other.uoffs = uoffs;
-		other.suboffs = suboffs;
-		other.looping = looping;
-		other.pingpong = pingpong;
-		other.reverse = reverse;
-		
-		other.env_vol = env_vol == null ? null : env_vol.dup();
-		other.env_pan = env_pan == null ? null : env_pan.dup();
-		other.env_per = env_per == null ? null : env_per.dup();
-		
-		other.curlplen = curlplen;
-		other.curlpbeg = curlpbeg;
-		
-		other.vol_glb = vol_glb;
-		other.vol_chn = vol_chn;
-		other.vol_note = vol_note;
-		other.vol_out = vol_out;
-		other.vol_env = vol_env;
-		other.vol_fadeout = vol_fadeout;
-		
-		other.pan_chn = pan_chn;
-		other.pan_env = pan_env;
-		
-		other.per_note = per_note;
-		other.per_targ = per_targ;
-		other.per_out = per_out;
-		other.per_env = per_env;
-		
-		other.filt_chn = filt_chn;
-		other.filt_env = filt_env;
-		other.filt_res = filt_res;
-		
-		other.filt_k2l = filt_k2l;
-		other.filt_k1l = filt_k1l;
-		other.filt_k2r = filt_k2r;
-		other.filt_k1r = filt_k1r;
-		
-		other.note_off = note_off;
-		other.note_fade = note_fade;
-		
-		other.master = this;
-		other.slave = slave;
-		slave = other;
-	}
-	
-	private int calcSlide1(int base, int amt)
-	{
-		return (int)(0.5 + base * Math.pow(2.0f, amt / 12.0f));
-	}
-	
-	private int calcSlide2(int base, int amt)
-	{
-		return (int)(0.5 + base * Math.pow(2.0f, amt / (2.0f * 12.0f)));
-	}
-	
-	private int calcSlide16(int base, int amt)
-	{
-		return calcSlide64(base, amt*4);
-	}
-	
-	private int calcSlide64(int base, int amt)
-	{
-		if(player.hasLinearSlides())
-			return (int)(0.5 + base * Math.pow(2.0f, amt / (64.0f * 12.0f)));
-		else {
-			int amiclk = 8363*428*4;
-			
-			int oper = amiclk / base;
-			int nper = oper - amt;
-			
-			return amiclk / nper;
-		}
-	}
-	
-	public void mix(float[][] buf, int offs, int len)
-	{
-		if((!active) || ((vol_chn&0x80) != 0))
-			return;
-		
-		doMix(buf, offs, len);
-		// TODO: ensure vol0 mix optimisations (heh) works properly
-		/*
-		if(mixing)
-			doMix(buf, offs, len);
-		else
-			doFix(len);
-		*/
-	}
 	
 	public float getCalculatedVol()
 	{
@@ -282,248 +103,12 @@ public class PlayerChannel
 	
 	private void calculateVol()
 	{
-		int base_vol_c = vol_glb * vol_chn * vol_env * vol_out >> (13+6+6+6-16);
-		float base_vol = (base_vol_c * vol_fadeout) / (float)(1<<(9+16));
+		float base_vol = vol_glb * vol_chn * vol_out / (float)(1<<(13+6+6));
 		
 		vol_calculated = base_vol;
 	}
 	
-	private void doMix(float[][] buf, int boffs, int blen)
-	{
-		// calculate main volume
-		calculateVol();
-		float base_vol = getCalculatedVol();
-		
-		// calculate main speed
-		int base_spd_c = calcSlide2(per_out, (per_env-32));
-		float base_spd_x = (float)base_spd_c / (float)player.getFreq();
-		int base_spd = (int)(base_spd_x * (float)(1<<13));
-		
-		if(reverse)
-			base_spd = -base_spd;
-		
-		// calculate panning
-		float vol1 = base_vol;
-		float vol2 = base_vol;
-		
-		if(player.hasStereo())
-		{
-			int base_pan_c = (pan_chn == 100 ? 32 : pan_chn) - 32;
-			base_pan_c = base_pan_c + (((32-Math.abs(base_pan_c))*(pan_env-32))>>5);
-			
-			if(base_pan_c < 0)
-				vol2 *= (32+base_pan_c)/32.0f;
-			else
-				vol1 *= (32-base_pan_c)/32.0f;
-			
-			if(pan_chn == 100)
-				vol2 = -vol2;
-		}
-		
-		// calculate filter coefficients
-		float fa = 1.0f;
-		float fb = 0.0f;
-		float fc = 0.0f;
-		if(filt_chn != 127 || filt_res != 0 || filt_env != 64)
-		{
-			// Word of Jeff:
-			// d = 2*(damping factor)*(sampling rate)/(natural frequency) + 2*(damping factor)-1. 
-			// e = (sampling rate/natural frequency)^2 
-			//
-			// a = 1/(1+d+e)
-			// b = (d+2e)/(1+d+e)
-			// c = -e/(1+d+e)
-			//
-			// according to the slightly more accurate Word of Jeff (some source code snippets),
-			// there's a weird thing you multiply by. i don't know why.
-			// with that said, those formulae are correct.
-			
-			float r = (float)Math.pow(2.0,(filt_chn*filt_env)/(24.0*64.0));
-			r = ((float)player.getFreq()*0.0012166620101443976f)/r;
-			float p = (float)Math.pow(10.0f,((-filt_res*24.0)/(128.0f*20.0f)));
-			
-			float d = 2.0f*p*(r+1.0f)-1.0f;
-			float e = r*r;
-			
-			fa = 1.0f/(1.0f+d+e);
-			fb = (d+2.0f*e)*fa;
-			fc = -e*fa;
-			
-			// XXX: attempt to de-NaN the code
-			//float tfc = fc/(fa*fb);
-			//if(fc < tfc)
-			//	fc = tfc;
-			
-			//System.out.printf("%f %f [%f, %f, %f / %f, %f]\n", filt_k1l, filt_k1r, fa, fb, fc, d, e);
-		}
-		
-		// load some things
-		
-		float[][] data = csmp.getData();
-		float[] dl = data[0];
-		float[] dr = data[1];
-		int length = data[0].length;
-		//System.out.printf("mix %d [%.3f, %.3f]\n", length, vol1, vol2);
-		int lpend = curlpbeg + curlplen;
-		int end = boffs + blen;
-		
-		vol1 *= fa;
-		vol2 *= fa;
-		
-		float[] bufl = buf[0];
-		float[] bufr = buf[1];
-		
-		if(curlplen <= 0)
-			looping = false;
-		
-		// FIXME: THIS IS SLOOOOOOOW
-		// and by slow, i mean the reso filter is probably the fastest part
-		// it probably has something to do with the looping bollocks
-		// FIXME: also ping-pong loops are buggered (ok maybe not so much now)
-		// FIXME: some would say loops are buggered full-stop
-		// FIXME: THIS MIXER SUCKS
-		//
-		// in short, this is the bottleneck and it's broken
-		for(int i = boffs; i < end; i++)
-		{
-			assert(offs >= 0);
-			
-			if(offs >= length)
-			{
-				// ASSES I HATE THIS CRAP
-				assert(!looping);
-				active = mixing = false;
-				break;
-			}
-			
-			float outl = dl[offs] * vol1 + filt_k1l * fb + filt_k2l * fc;
-			float outr = dr[offs] * vol2 + filt_k1r * fb + filt_k2r * fc;
-			
-			// TODO: work out the appropriate threshold for de-NaN'ing
-			// would also be wise to fiddle with fa,fb,fc
-			// instead of cluttering up the mix function with if statements
-			if(outl >= 1.0f)
-				outl = 1.0f;
-			if(outr >= 1.0f)
-				outr = 1.0f;
-			if(outl <= -1.0f)
-				outl = -1.0f;
-			if(outr <= -1.0f)
-				outr = -1.0f;
-			
-			bufl[i] += outl;
-			bufr[i] += outr;
-			
-			filt_k2l = filt_k1l;
-			filt_k1l = outl;
-			filt_k2r = filt_k1r;
-			filt_k1r = outr;
-			
-			/*
-			bufl[i] += dl[offs] * vol1;
-			bufr[i] += dr[offs] * vol2;
-			*/
-			
-			suboffs += base_spd;
-			offs += suboffs>>13;
-			suboffs &= (1<<13)-1;
-			
-			if(looping)
-			{
-				if(pingpong)
-				{
-					if(reverse && offs < curlpbeg)
-					{
-						offs = curlpbeg*2 - offs;
-						reverse = !reverse;
-						base_spd = -base_spd;
-					}
-					
-					if(offs >= lpend)
-					{
-						offs -= curlpbeg;
-						
-						// beg=1,len=4 => {1234321}
-						offs %= curlplen*2-1;
-						boolean oldreverse = reverse;
-						reverse = offs >= curlplen;
-						if(reverse)
-							offs = curlplen*2-1 - offs;
-						
-						if(oldreverse != reverse)
-							base_spd = -base_spd;
-						
-						offs += curlpbeg;
-					}
-				} else {
-					if(offs >= lpend)
-					{
-						offs = (offs-curlpbeg)%curlplen + curlpbeg;
-					}
-				}
-			}
-			
-			if(offs < 0)
-			{
-				offs = -offs;
-			}
-		}
-	}
-	
-	private void doFix(int len)
-	{
-		// if "mixing" is false, calculate next part
-		int length = csmp.getData()[0].length;
-		
-		// get time
-		double time = ((double)len)/player.getFreq();
-		
-		// move sample stuff across
-		suboffs += time;
-		offs += (reverse ? -1 : 1) * (int)suboffs;
-		suboffs %= 1.0f;
-		
-		// flip if reversed too far left
-		if(offs < 0)
-		{
-			offs = -offs;
-			reverse = false;
-		}
-		
-		// XXX: NEEDS LOTS OF TESTING!
-		
-		// check if looping
-		if(looping)
-		{
-			// check if ping-pong
-			if(pingpong)
-			{
-				// check if gone over end
-				if(offs >= curlpbeg+curlplen)
-				{
-					// adjust for loop
-					offs -= curlpbeg;
-					reverse = offs > curlplen;
-					offs += curlpbeg;
-				}
-			} else {
-				// check if gone over end
-				if(offs >= curlpbeg+curlplen)
-				{
-					// adjust for loop
-					offs = (offs - curlpbeg) % curlplen + curlpbeg;
-				}
-			}
-		} else {
-			// check end of sample
-			if(offs >= length)
-			{
-				// kill the sample
-				active = false;
-			}
-		}
-	}
-	
+	// referred to by Player, silly --GM
 	public void calcOutputVolFreq()
 	{
 		vol_out = vol_note;
@@ -560,14 +145,14 @@ public class PlayerChannel
 	{
 		if(per_note < per_targ)
 		{
-			per_note = calcSlide16(per_note, amt);
+			per_note = player.calcSlide16(per_note, amt);
 			if(per_note > per_targ)
 			{
 				per_note = per_targ;
 				last_note = per_targ_note;
 			}
 		} else {
-			per_note = calcSlide16(per_note, -amt);
+			per_note = player.calcSlide16(per_note, -amt);
 			if(per_note < per_targ)
 			{
 				per_note = per_targ;
@@ -694,11 +279,11 @@ public class PlayerChannel
 		int mul = down ? -1 : 1;
 		
 		if((mask & 0xF0) == 0xF0)
-			per_note = calcSlide16(per_note, (mask & 0x0F)*mul);
+			per_note = player.calcSlide16(per_note, (mask & 0x0F)*mul);
 		else if((mask & 0xF0) == 0xE0)
-			per_note = calcSlide64(per_note, (mask & 0x0F)*mul);
+			per_note = player.calcSlide64(per_note, (mask & 0x0F)*mul);
 		else
-			per_note = calcSlide16(per_note, mask*mul);
+			per_note = player.calcSlide16(per_note, mask*mul);
 	}
 	
 	private double getWaveform(int type, int offs)
@@ -726,7 +311,7 @@ public class PlayerChannel
 		
 		//System.out.printf("vib %.3f\n", amp);
 		
-		per_out = calcSlide16(per_out, (int)(amp+0.5));
+		per_out = player.calcSlide16(per_out, (int)(amp+0.5));
 	}
 	
 	private boolean checkVolSlide0(int mask)
@@ -744,42 +329,31 @@ public class PlayerChannel
 		return ((mask & 0x0F) == 0x00 || (mask & 0xF0) == 0x00);
 	}
 	
-	public void updateEnvelopes()
+	public void updateVirtualChannel()
 	{
-		if(!active)
+		if(vchn == null)
 			return;
 		
-		if(env_vol != null)
-			vol_env = env_vol.read();
-		if(env_pan != null)
-			pan_env = env_pan.read() + 32;
-		if(env_per != null)
-		{
-			int pval = env_per.read() + 32;
-			
-			if(env_per.hasFilter())
-				filt_env = pval + 32;
-			else
-				per_env = pval;
-		}
+		calculateVol();
+		vchn.importVol(getCalculatedVol());
+		vchn.importPan(pan_chn);
+		vchn.importPer(per_out);
+		vchn.importFilt(filt_chn, filt_res);
+	}
+	
+	private void checkVirtualChannel()
+	{
+		if(vchn == null)
+			return;
 		
-		if(note_fade && cins != null)
-		{
-			vol_fadeout -= cins.getFadeout();
-			
-			if(vol_fadeout < 0)
-				vol_fadeout = 0;
-		}
-		
-		if((!note_fade) && env_vol.fadeCheck(note_off))
-		{
-			System.out.printf("NOTEFADE volcheck\n");
-			note_fade = true;
-		}
+		if(!vchn.imYoursRight(this))
+			vchn = null;
 	}
 	
 	public void update0(int note, int ins, int vol, int eft, int efp)
 	{
+		checkVirtualChannel();
+		
 		pat_note = note;
 		pat_ins = ins;
 		pat_vol = vol;
@@ -1070,7 +644,7 @@ public class PlayerChannel
 		}
 		
 		boolean porta_test_root = (pat_eft != 0x07 && pat_eft != 0x0C);
-		boolean porta_test = ((!active) || porta_test_root);
+		boolean porta_test = (isActive() || porta_test_root);
 		
 		if(note < 120 && cins != null && porta_test)
 			triggerNNA();
@@ -1084,11 +658,8 @@ public class PlayerChannel
 				SessionInstrument h_ins = player.getInstrument(ins);
 				if(h_ins != null)
 				{
-					cins = h_ins;
+					changeVirtualInstrument(h_ins);
 					ins_idx = ins;
-					env_vol = cins.getVolEnvHandle();
-					env_pan = cins.getPanEnvHandle();
-					env_per = cins.getPerEnvHandle();
 				}
 			} else {
 				ins_idx = ins;
@@ -1119,9 +690,7 @@ public class PlayerChannel
 			SessionSample h_smp = player.getSample(usmp);
 			if(h_smp != null)
 			{
-				csmp = h_smp;
-				doLoop();
-				doSustainLoop();
+				changeVirtualSample(h_smp);
 				smp_idx = usmp;
 			}
 		}
@@ -1135,7 +704,6 @@ public class PlayerChannel
 			vol_note = csmp.getVol();
 			if(unlockvol)
 				vol_out = vol_note;
-			vol_fadeout = 1024; // XXX: HORRIBLE ASSUMPTION
 		}
 		
 		if(note < 120 || (note != 254 && smpchange))
@@ -1191,56 +759,99 @@ public class PlayerChannel
 		}
 	}
 	
+	private void changeVirtualSample(SessionSample csmp)
+	{
+		this.csmp = csmp;
+		
+		if(vchn != null)
+			vchn.changeSample(csmp);
+	}
+	
+	private void changeVirtualInstrument(SessionInstrument cins)
+	{
+		this.cins = cins;
+		
+		/*
+		env_vol = cins.getVolEnvHandle();
+		env_pan = cins.getPanEnvHandle();
+		env_per = cins.getPerEnvHandle();
+		*/
+		
+		if(vchn != null)
+			vchn.changeInstrument(cins);
+	}
+	
 	private void retrigNote()
 	{
-		offs = uoffs;
-		suboffs = 0;
-		reverse = false;
-		active = mixing = true;
-		note_off = false;
-		note_fade = false;
-		vol_fadeout = 1024;
+		retrigVirtualChannel();
 		
 		eff_qxx_tickdown = eff_qxx&15;
 	}
 	
-	private void triggerNNA()
+	private void retrigVirtualChannel()
 	{
-		if(!active)
-			return;
-		
-		if(cins == null)
-			return;
-		
-		int nna = cins.getNNA();
-		if(nna == SessionInstrument.NNA_CUT)
-			return;
-		
-		PlayerChannel newSlave = player.allocateNNA();
-		
-		if(newSlave == null)
-			return;
-		
-		loadSlave(newSlave);
-		
-		switch(nna)
+		if(vchn == null)
 		{
-			case SessionInstrument.NNA_OFF:
-				slave.noteOff();
-				break;
-			case SessionInstrument.NNA_FADE:
-				slave.noteFade();
-				break;
-			default:
-				assert(nna == SessionInstrument.NNA_CONTINUE);
-				//System.out.printf("NNA TYPE %d\n", nna);
-				break;
+			allocateVirtualChannel();
+			if(vchn == null)
+				return;
 		}
 		
+		vchn.changeInstrument(cins);
+		vchn.changeSample(csmp);
+		vchn.retrig(uoffs);
+	}
+	
+	private void allocateVirtualChannel()
+	{
+		VirtualChannel nvchn = player.allocateVirtualChannel();
+		
+		if(nvchn != null)
+		{
+			nvchn.reset();
+			if(vchn != null)
+				nvchn.enslave(this, vchn);
+			nvchn.changeSample(csmp);
+			nvchn.changeInstrument(cins);
+		}
+		
+		// XXX: is this a good idea?
+		vchn = nvchn;
+	}
+	
+	private void triggerNNA()
+	{
+		if(vchn != null)
+		{
+			if(cins == null)
+				return;
+			
+			int nna = cins.getNNA();
+			if(nna == SessionInstrument.NNA_CUT)
+				return; // reuse same channel
+			
+			switch(nna)
+			{
+				case SessionInstrument.NNA_OFF:
+					noteOff();
+					break;
+				case SessionInstrument.NNA_FADE:
+					noteFade();
+					break;
+				default:
+					assert(nna == SessionInstrument.NNA_CONTINUE);
+					//System.out.printf("NNA TYPE %d\n", nna);
+					break;
+			}
+		}
+		
+		allocateVirtualChannel();
 	}
 	
 	public void updateN()
 	{
+		checkVirtualChannel();
+		
 		if(pat_eft != 0x13 || (eff_sxx & 0xF0) != 0xD0)
 		{
 			// TODO: voleffects
@@ -1297,10 +908,10 @@ public class PlayerChannel
 					case 0:
 						break;
 					case 1:
-						per_out = calcSlide1(per_note, eff_jxx>>4);
+						per_out = player.calcSlide1(per_note, eff_jxx>>4);
 						break;
 					default:
-						per_out = calcSlide1(per_note, eff_jxx&15);
+						per_out = player.calcSlide1(per_note, eff_jxx&15);
 						eff_jxx_tickup = -1;
 						break;
 						
@@ -1336,53 +947,35 @@ public class PlayerChannel
 	
 	public void noteOff()
 	{
-		note_off = true;
+		if(vchn == null)
+			return;
 		
-		doLoop();
-		
-		if(env_vol != null)
-			env_vol.noteOff();
-		if(env_pan != null)
-			env_pan.noteOff();
-		if(env_per != null)
-			env_per.noteOff();
-		
-		// TODO: work out how this works in the context of NNAs
+		vchn.noteOff();
 	}
 	
 	public void noteCut()
 	{
-		active = mixing = false;
+		if(vchn == null)
+			return;
 		
-		if(env_vol != null)
-			env_vol.stop();
-		if(env_pan != null)
-			env_pan.stop();
-		if(env_per != null)
-			env_per.stop();
-		
-		// TODO: work out how this works in the context of NNAs
+		vchn.noteCut();
+		vchn.detach();
+		vchn = null;
 	}
 	
 	public void noteFade()
 	{
-		note_fade = true;
-		// TODO: work out how this works in the context of NNAs
+		if(vchn == null)
+			return;
+		
+		vchn.noteFade();
 	}
 	
-	public boolean isForeground()
-	{
-		return master == null;
-	}
+	// getters
 	
-	public boolean isNoteOn()
+	private boolean isActive()
 	{
-		return !note_off;
-	}
-	
-	public boolean isActive()
-	{
-		return active;
+		return vchn != null && vchn.isActive();
 	}
 	
 	// setters
@@ -1401,47 +994,11 @@ public class PlayerChannel
 	public void setChannelVolume(int vol)
 	{
 		vol_chn = vol;
-		
-		// NO DON'T DO THIS YOU EGG --GM
-		//if(slave != null)
-		//	slave.setChannelVolume(vol);
 	}
 	
 	public void setChannelPanning(int pan)
 	{
 		pan_chn = pan;
-	}
-	
-	private void doLoop()
-	{
-		looping = pingpong = false;
-		
-		if(csmp != null)
-		{
-			curlpbeg = csmp.getLpBeg();
-			curlplen = csmp.getLpLen();
-			
-			if((csmp.getFlags() & SessionSample.SFLG_LOOP) != 0)
-				looping = true;
-			if((csmp.getFlags() & SessionSample.SFLG_BIDI) != 0)
-				pingpong = true;
-		}
-	}
-	
-	private void doSustainLoop()
-	{
-		if(csmp == null)
-			return;
-		
-		if((csmp.getFlags() & SessionSample.SFLG_SUSLOOP) != 0)
-		{
-			looping = true;
-			curlpbeg = csmp.getSusBeg();
-			curlplen = csmp.getSusLen();
-			pingpong = false;
-			if((csmp.getFlags() & SessionSample.SFLG_SUSBIDI) != 0)
-				pingpong = true;
-		}
 	}
 	
 }
