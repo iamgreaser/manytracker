@@ -321,14 +321,11 @@ public class PlayerChannel
 		}
 		
 		// calculate filter coefficients
-		// code blatantly stolen from gmpyitplay.py but that's OK because i wrote it myself
 		float fa = 1.0f;
 		float fb = 0.0f;
 		float fc = 0.0f;
 		if(filt_chn != 127 || filt_res != 0 || filt_env != 64)
 		{
-			// thanks madbrain for the notes on the resonant freq (~5kHz).
-			
 			// Word of Jeff:
 			// d = 2*(damping factor)*(sampling rate)/(natural frequency) + 2*(damping factor)-1. 
 			// e = (sampling rate/natural frequency)^2 
@@ -336,19 +333,26 @@ public class PlayerChannel
 			// a = 1/(1+d+e)
 			// b = (d+2e)/(1+d+e)
 			// c = -e/(1+d+e)
+			//
+			// according to the slightly more accurate Word of Jeff (some source code snippets),
+			// there's a weird thing you multiply by. i don't know why.
+			// with that said, those formulae are correct.
 			
-			float cofreq = (float)Math.pow(2.0f, filt_chn*filt_env/(24.0f*64.0f))*110.0f*((float)Math.PI)*2.0f;
-			float freqcalc = ((float)player.getFreq()/cofreq);
+			float r = (float)Math.pow(2.0,(filt_chn*filt_env)/(24.0*64.0));
+			r = ((float)player.getFreq()*0.0012166620101443976f)/r;
+			float p = (float)Math.pow(10.0f,((-filt_res*24.0)/(128.0f*20.0f)));
 			
-			float d = (float)Math.pow(10.0f, -(filt_res*24.0f)/(128.0f*20.0f))*(freqcalc+1.0f)-1.0f;
-			if(d < 0.0f)
-				d = 0.0f; // TODO: fix this PROPERLY. (i get NaN'd on JEFF93.IT otherwise)
-			float e = freqcalc * freqcalc;
+			float d = 2.0f*p*(r+1.0f)-1.0f;
+			float e = r*r;
 			
 			fa = 1.0f/(1.0f+d+e);
 			fb = (d+2.0f*e)*fa;
 			fc = -e*fa;
-			float scl = Math.abs(fa*fb*fc);
+			
+			// XXX: attempt to de-NaN the code
+			//float tfc = fc/(fa*fb);
+			//if(fc < tfc)
+			//	fc = tfc;
 			
 			//System.out.printf("%f %f [%f, %f, %f / %f, %f]\n", filt_k1l, filt_k1r, fa, fb, fc, d, e);
 		}
@@ -394,6 +398,18 @@ public class PlayerChannel
 			
 			float outl = dl[offs] * vol1 + filt_k1l * fb + filt_k2l * fc;
 			float outr = dr[offs] * vol2 + filt_k1r * fb + filt_k2r * fc;
+			
+			// TODO: work out the appropriate threshold for de-NaN'ing
+			// would also be wise to fiddle with fa,fb,fc
+			// instead of cluttering up the mix function with if statements
+			if(outl >= 1.0f)
+				outl = 1.0f;
+			if(outr >= 1.0f)
+				outr = 1.0f;
+			if(outl <= -1.0f)
+				outl = -1.0f;
+			if(outr <= -1.0f)
+				outr = -1.0f;
 			
 			bufl[i] += outl;
 			bufr[i] += outr;
@@ -755,7 +771,11 @@ public class PlayerChannel
 				vol_fadeout = 0;
 		}
 		
-		note_fade = note_fade || env_vol.fadeCheck(note_off);
+		if((!note_fade) && env_vol.fadeCheck(note_off))
+		{
+			System.out.printf("NOTEFADE volcheck\n");
+			note_fade = true;
+		}
 	}
 	
 	public void update0(int note, int ins, int vol, int eft, int efp)
@@ -1177,6 +1197,8 @@ public class PlayerChannel
 		suboffs = 0;
 		reverse = false;
 		active = mixing = true;
+		note_off = false;
+		note_fade = false;
 		vol_fadeout = 1024;
 		
 		eff_qxx_tickdown = eff_qxx&15;
