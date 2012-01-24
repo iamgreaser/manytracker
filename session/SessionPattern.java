@@ -26,6 +26,7 @@ public class SessionPattern
 	
 	public static final int FORMAT_IT = 1;
 	public static final int FORMAT_MOD = 2;
+	public static final int FORMAT_S3M = 3;
 	
 	// pattern info
 	
@@ -41,6 +42,7 @@ public class SessionPattern
 				loadDataIT(session, fp);
 				break;
 			case FORMAT_MOD:
+			case FORMAT_S3M:
 				throw new RuntimeException("incorrect constructor for pattern format");
 			default:
 				throw new RuntimeException("pattern format not supported");
@@ -55,9 +57,92 @@ public class SessionPattern
 				loadDataMOD(session, fp, secondary);
 				break;
 			case FORMAT_IT:
+			case FORMAT_S3M:
 				throw new RuntimeException("incorrect constructor for pattern format");
 			default:
 				throw new RuntimeException("pattern format not supported");
+		}
+	}
+	
+	public SessionPattern(Session session, RandomAccessFile fp, int format, int[] secondary) throws IOException
+	{
+		switch(format)
+		{
+			case FORMAT_S3M:
+				loadDataS3M(session, fp, secondary);
+				break;
+			case FORMAT_IT:
+			case FORMAT_MOD:
+				throw new RuntimeException("incorrect constructor for pattern format");
+			default:
+				throw new RuntimeException("pattern format not supported");
+		}
+	}
+	
+	private void loadDataS3M(Session session, RandomAccessFile fp, int[] chnmap) throws IOException
+	{
+		// TODO: do something interesting with the channel mapping
+		
+		int size = 0xFFFF&(int)Short.reverseBytes(fp.readShort());
+		this.tracks = new SessionTrack[64];
+		this.rows = 64;
+		
+		
+		int[] ld = new int[5];
+		
+		for(int r = 0; r < rows; r++)
+		{
+			while(true)
+			{
+				int mask = fp.read();
+				if(mask == 0)
+					break;
+				
+				int chn = (mask & 0x1F);
+				
+				if(tracks[chn] == null)
+					tracks[chn] = new SessionTrack(rows);
+				
+				ld[0] = 253;
+				ld[2] = 255;
+				ld[1] = ld[3] = ld[4] = 0;
+				
+				if((mask & 0x20) != 0)
+				{
+					int note = fp.read();
+					
+					if(note <= 0x8C)
+					{
+						note = (note>>4)*12+(note&15);
+						note += 12;
+					} else if(note != 254) {
+						note = 253;
+					}
+					
+					ld[0] = note;
+					ld[1] = fp.read();
+				}
+				
+				if((mask & 0x40) != 0)
+					ld[2] = fp.read();
+				
+				if((mask & 0x80) != 0)
+				{
+					// TODO: filter pattern data
+					ld[3] = fp.read();
+					ld[4] = fp.read();
+					
+					// ok apparently IT does this conversion
+					// so let's do the same damn thing
+					if(ld[3] == 0x18 && ld[4] == 0xA4)
+					{
+						ld[3] = 0x13;
+						ld[4] = 0x91;
+					}
+				}
+				
+				tracks[chn].setData(r, ld);
+			}
 		}
 	}
 	

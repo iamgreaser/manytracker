@@ -322,7 +322,7 @@ public class PlayerChannel
 	private double getWaveform(int type, int offs)
 	{
 		// TODO: types that aren't 0
-		return Math.sin((offs&255)*Math.PI/128.0);
+		return -Math.sin((offs&255)*Math.PI/128.0);
 	}
 	
 	public void doVibrato(int mask, boolean fine)

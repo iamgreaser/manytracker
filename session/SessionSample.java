@@ -11,6 +11,7 @@ public class SessionSample
 	
 	public static final int FORMAT_IT = 1;
 	public static final int FORMAT_MOD = 2;
+	public static final int FORMAT_S3M = 3;
 	
 	// IMPS bollocks
 	
@@ -60,6 +61,23 @@ public class SessionSample
 			case FORMAT_MOD:
 				loadDataMOD(fp);
 				break;
+			case FORMAT_S3M:
+				throw new RuntimeException("incorrect constructor for sample format");
+			default:
+				throw new RuntimeException("sample format not supported");
+		}
+	}
+	
+	public SessionSample(RandomAccessFile fp, int format, int secondary) throws IOException
+	{
+		switch(format)
+		{
+			case FORMAT_S3M:
+				loadDataS3M(fp, secondary);
+				break;
+			case FORMAT_IT:
+			case FORMAT_MOD:
+				throw new RuntimeException("incorrect constructor for sample format");
 			default:
 				throw new RuntimeException("sample format not supported");
 		}
@@ -89,6 +107,77 @@ public class SessionSample
 		// TODO: append MOD loop to end
 		
 		data[0] = data[1] = xdata;
+		
+		unrollLoops();
+	}
+	
+	public void loadDataS3M(RandomAccessFile fp, int ffi) throws IOException
+	{
+		byte[] b = new byte[28];
+		
+		int instype = fp.read();
+		
+		// don't load adlib instruments!
+		if(instype != 1)
+			return;
+		
+		this.fname = Util.readStringNoNul(fp, b, 12);
+		
+		int samplepointer = 0;
+		samplepointer += fp.read()<<16;
+		samplepointer += fp.read();
+		samplepointer += fp.read()<<8;
+		samplepointer *= 16;
+		
+		//System.out.printf("%08X\n", samplepointer);
+		
+		this.length = Integer.reverseBytes(fp.readInt());
+		this.lpbeg = Integer.reverseBytes(fp.readInt());
+		this.lplen = Integer.reverseBytes(fp.readInt()) - this.lpbeg;
+		
+		this.vol = fp.read();
+		fp.read(); // Future Crew are REALLY good at leaving unassigned bytes!
+		int st3pack = fp.read();
+		int st3flg = fp.read();
+		
+		if(st3pack != 0)
+			throw new RuntimeException(String.format("TODO: S3M packing type %02X", st3pack));
+		
+		flg = SFLG_EXISTS;
+		if((st3flg & 0x01) != 0)
+			flg |= SFLG_LOOP;
+		if((st3flg & 0x02) != 0)
+			flg |= SFLG_STEREO;
+		if((st3flg & 0x04) != 0)
+			flg |= SFLG_16BIT;
+		
+		
+		this.c5speed = Integer.reverseBytes(fp.readInt());
+		fp.readInt(); // unused and
+		fp.readInt(); // internal
+		fp.readInt(); // bollocks
+		
+		this.name = Util.readString(fp, b, 28);
+		
+		this.cvt = (ffi == 1 ? 0x01 : 0x00);
+		
+		if(this.length > 0)
+		{
+			fp.seek(samplepointer);
+			
+			if((flg & SFLG_STEREO) != 0)
+			{
+				data = new float[2][length];
+				loadSampleData(fp, data[0]);
+				loadSampleData(fp, data[1]);
+			} else {
+				data = new float[2][];
+				data[0] = data[1] = new float[length];
+				loadSampleData(fp, data[0]);
+			}
+		} else {
+			this.data = null;
+		}
 		
 		unrollLoops();
 	}

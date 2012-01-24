@@ -12,6 +12,7 @@ public class Session
 	
 	public static final int FORMAT_IT = 1;
 	public static final int FORMAT_MOD = 2;
+	public static final int FORMAT_S3M = 3;
 	
 	// network bollocks
 	private ArrayList<SessionUser> users = new ArrayList<SessionUser>();
@@ -93,9 +94,18 @@ public class Session
 		
 		// Load IMPM header
 		fp.read(b, 0, 4);
-		if(b[0] == 'I' || b[1] == 'M' || b[2] == 'P' || b[3] == 'M')
+		if(b[0] == 'I' && b[1] == 'M' && b[2] == 'P' && b[3] == 'M')
 		{
 			loadDataIT(fp);
+			return;
+		}
+		
+		// Attempt to load ST3 module
+		fp.seek(0x1C);
+		if(fp.readUnsignedShort() == 0x1A10)
+		{
+			fp.seek(0);
+			loadDataS3M(fp);
 			return;
 		}
 		
@@ -109,6 +119,125 @@ public class Session
 		}
 		
 		throw new RuntimeException("module format not supported");
+	}
+	
+	private void loadDataS3M(RandomAccessFile fp) throws IOException
+	{
+		byte[] b = new byte[28];
+		
+		this.name = Util.readString(fp, b, 28);
+		System.out.printf("name: \"%s\"\n", name);
+		
+		fp.readInt(); // first two bytes we've seen, second two are unused
+		
+		int ordnum = 0xFFFF&(int)Short.reverseBytes(fp.readShort());
+		int smpnum = 0xFFFF&(int)Short.reverseBytes(fp.readShort());
+		int patnum = 0xFFFF&(int)Short.reverseBytes(fp.readShort());
+		int s3flags = 0xFFFF&(int)Short.reverseBytes(fp.readShort());
+		int s3cwtv = 0xFFFF&(int)Short.reverseBytes(fp.readShort());
+		int ffi = 0xFFFF&(int)Short.reverseBytes(fp.readShort());
+		
+		fp.readInt(); // should have "SCRM" but really doesn't matter
+		
+		this.flags = FLAG_OLDEFFECTS | FLAG_VOL0MIX;
+		
+		this.gv = fp.read()*2;
+		this.spd = fp.read();
+		this.bpm = fp.read();
+		this.mv = fp.read();
+		fp.read(); // NO WE DON'T HAVE A GUS
+		int dfpflag = fp.read();
+		
+		if((this.mv & 0x80) != 0)
+		{
+			this.mv &= ~0x80;
+			this.flags |= FLAG_STEREO;
+			// XXX: this might need to be done internally in the player
+			//      if it turns out that IT does the same damn thing --GM
+			this.mv = (this.mv*11+4)>>3;
+		}
+		
+		// skip all that bollocks
+		fp.seek(0x40);
+		
+		// load channel mappings
+		// yes, we WILL want these!
+		// though i don't think anyone's done anything completely bonkers
+		// except Storlek and myself --GM
+		int[] st3chnmap = new int[32];
+		
+		for(int i = 32; i < 64; i++)
+		{
+			chnvol[i] = (byte)0xC0;
+			chnpan[i] = 0x20;
+		}
+		
+		for(int i = 0; i < 32; i++)
+		{
+			chnpan[i] = 0;
+			
+			int v = fp.read();
+			st3chnmap[i] = v & 0x7F;
+			
+			// don't enable FM channels!
+			chnvol[i] = ((v & 0x80) != 0 && (v & 0x7F) < 16)
+				? 0x40
+				: (byte)0xC0
+					;
+		}
+		
+		// orderlist!
+		// DON'T EVEN NEED TO FILTER IT YES :D
+		for(int i = 0; i < ordnum; i++)
+			orderlist[i] = fp.read();
+		for(int i = ordnum; i < 256; i++)
+			orderlist[i] = 255;
+		
+		// load pointers
+		int[] smpptrs = new int[smpnum];
+		int[] patptrs = new int[patnum];
+		
+		for(int i = 0; i < smpnum; i++)
+			smpptrs[i] = (0xFFFF&(int)Short.reverseBytes(fp.readShort()))*16;
+		for(int i = 0; i < patnum; i++)
+			patptrs[i] = (0xFFFF&(int)Short.reverseBytes(fp.readShort()))*16;
+		
+		// load default panning if necessary
+		for(int i = 0; i < 32; i++)
+		{
+			int v = (dfpflag == 252)
+				? fp.read()
+				: 0x10
+					;
+			
+			int pan = (v & 0x10) != 0
+				? (flags & FLAG_STEREO) != 0
+					? (v & 0x08) != 0
+						? 0xC
+						: 0x3
+					: 0x7
+				: v & 15
+			;
+			
+			// TODO: scale this crap correctly
+			chnpan[i] = (byte)((pan+2)<<2);
+		}
+		
+		// load data
+		for(int i = 0; i < smpnum; i++)
+			if(smpptrs[i] != 0)
+			{
+				fp.seek(smpptrs[i]);
+				map_smp.put((Integer)(i+1), new SessionSample(fp, SessionSample.FORMAT_S3M, ffi));
+			}
+		for(int i = 0; i < patnum; i++)
+			if(patptrs[i] != 0)
+			{
+				fp.seek(patptrs[i]);
+				map_pat.put((Integer)i, new SessionPattern(this, fp, SessionPattern.FORMAT_S3M, st3chnmap));
+			}
+		
+		// XXX: any other crap this needs? --GM
 	}
 	
 	private void loadDataMOD(RandomAccessFile fp) throws IOException

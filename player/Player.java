@@ -243,6 +243,8 @@ public class Player
 			int oper = amiclk / base;
 			int nper = oper - amt;
 			
+			if(nper < 1)
+				nper = 1;
 			return amiclk / nper;
 		}
 	}
