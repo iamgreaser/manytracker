@@ -792,7 +792,7 @@ public class PlayerChannel
 		if(note < 120)
 			last_note = note;
 		
-		if((ins != 0 && note != 255) || note < 120)
+		if(((ins != 0 && note != 255) || note < 120) && last_note < 120)
 		{
 			int smpnote = player.getSampleAndNote(ins_idx, last_note);
 			

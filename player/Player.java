@@ -16,7 +16,7 @@ public class Player
 			chns[i] = new PlayerChannel(this);
 	}
 	
-	private VirtualChannel[] vchns = new VirtualChannel[64]; {
+	private VirtualChannel[] vchns = new VirtualChannel[256]; {
 		// TODO speed up the reso filter mixer
 		for(int i = 0; i < vchns.length; i++)
 			vchns[i] = new VirtualChannel(this);

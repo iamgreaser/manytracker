@@ -7,6 +7,8 @@ public class VirtualChannel
 	// flags
 	public static final boolean DEBUG_TORTURE_CPU = false;
 	public static final boolean NO_FILTERS = false;
+	public static final boolean FILTER_MIX_MONOONLY = false;
+	public static final boolean FILTER_MIX_STEREOONLY = false;
 	public static final float FILTER_NAN_THRESHOLD = 0.99f;
 	
 	// playback info
@@ -352,11 +354,48 @@ public class VirtualChannel
 					offs += suboffs>>13;
 					suboffs &= (1<<13)-1;
 				}	
-			} else if((csmp.getFlags() & SessionSample.SFLG_STEREO) == 0) {
+			} else if(FILTER_MIX_MONOONLY || ((!FILTER_MIX_STEREOONLY) && (csmp.getFlags() & SessionSample.SFLG_STEREO) == 0)) {
 				// mono sample filter mix
-				for(int i = boffs; i < end; i++)
+				// TODO: port this to the stereo sample filter mixer
+				int endx = end - (end-boffs) % 3;
+				
+				float k0 = 0.0f;
+				float k1 = filt_k1l;
+				float k2 = filt_k2l;
+				for(int i = boffs; i < endx;)
 				{
-					float outl = dl[offs] * filt_a + filt_k1l * fb + filt_k2l * fc;
+					k0 = dl[offs] * fa + k1 * fb + k2 * fc;
+					
+					suboffs += base_spd;
+					offs += suboffs>>13;
+					suboffs &= (1<<13)-1;
+					
+					k2 = dl[offs] * fa + k0 * fb + k1 * fc;
+					
+					suboffs += base_spd;
+					offs += suboffs>>13;
+					suboffs &= (1<<13)-1;
+					
+					k1 = dl[offs] * fa + k2 * fb + k0 * fc;
+					
+					suboffs += base_spd;
+					offs += suboffs>>13;
+					suboffs &= (1<<13)-1;
+					
+					bufl[i] += k0 * vol1;
+					bufr[i++] += k0 * vol2;
+					bufl[i] += k2 * vol1;
+					bufr[i++] += k2 * vol2;
+					bufl[i] += k1 * vol1;
+					bufr[i++] += k1 * vol2;
+				}
+				
+				filt_k1l = k1;
+				filt_k2l = k2;
+				
+				for(int i = endx; i < end; i++)
+				{
+					float outl = dl[offs] * fa + filt_k1l * fb + filt_k2l * fc;
 					
 					bufl[i] += outl * vol1;
 					bufr[i] += outl * vol2;
@@ -372,10 +411,54 @@ public class VirtualChannel
 				filt_k1r = filt_k1l;
 			} else {
 				// stereo sample filter mix
-				vol1 *= filt_a;
-				vol2 *= filt_a;
+				vol1 *= fa;
+				vol2 *= fa;
 				
-				for(int i = boffs; i < end; i++)
+				int endx = end - (end-boffs) % 3;
+				
+				float k0l = 0.0f;
+				float k1l = filt_k1l;
+				float k2l = filt_k2l;
+				float k0r = 0.0f;
+				float k1r = filt_k1r;
+				float k2r = filt_k2r;
+				for(int i = boffs; i < endx;)
+				{
+					k0l = dl[offs] * vol1 + k1l * fb + k2l * fc;
+					k0r = dr[offs] * vol2 + k1r * fb + k2r * fc;
+					
+					suboffs += base_spd;
+					offs += suboffs>>13;
+					suboffs &= (1<<13)-1;
+					
+					k2l = dl[offs] * vol1 + k0l * fb + k1l * fc;
+					k2r = dr[offs] * vol2 + k0r * fb + k1r * fc;
+					
+					suboffs += base_spd;
+					offs += suboffs>>13;
+					suboffs &= (1<<13)-1;
+					
+					k1l = dl[offs] * vol1 + k2l * fb + k0l * fc;
+					k1r = dr[offs] * vol2 + k2r * fb + k0r * fc;
+					
+					suboffs += base_spd;
+					offs += suboffs>>13;
+					suboffs &= (1<<13)-1;
+					
+					bufl[i] += k0l;
+					bufr[i++] += k0r;
+					bufl[i] += k2l;
+					bufr[i++] += k2r;
+					bufl[i] += k1l;
+					bufr[i++] += k1r;
+				}
+				
+				filt_k1l = k1l;
+				filt_k2l = k2l;
+				filt_k1r = k1r;
+				filt_k2r = k2r;
+				
+				for(int i = endx; i < end; i++)
 				{
 					float outl = dl[offs] * vol1 + filt_k1l * fb + filt_k2l * fc;
 					float outr = dr[offs] * vol2 + filt_k1r * fb + filt_k2r * fc;
