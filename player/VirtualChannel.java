@@ -304,7 +304,7 @@ public class VirtualChannel
 		
 		float[] dl = data[0];
 		float[] dr = data[1];
-		int length = data[0].length;
+		int length = csmp.getLength();
 		//System.out.printf("mix %d [%.3f, %.3f]\n", length, vol1, vol2);
 		int xcurlplen = (pingpong ? curlplen*2-1 : curlplen);
 		int lpend = curlpbeg + xcurlplen;

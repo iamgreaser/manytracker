@@ -747,4 +747,9 @@ public class SessionSample
 	{
 		return this.c5speed;
 	}
+	
+	public int getLength()
+	{
+		return this.length;
+	}
 }

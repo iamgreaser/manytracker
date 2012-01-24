@@ -80,6 +80,7 @@ public class MMCMPUnpacker extends RandomAccessFile
 		
 		// known versions:
 		// 0x130F = 1.30
+		// 0x1310 = 1.31
 		// 0x1330 = 1.33
 		// 0x1340 = 1.34
 		System.out.printf("unknown 1:     %04X\n", unk1);
@@ -102,7 +103,7 @@ public class MMCMPUnpacker extends RandomAccessFile
 			int blkpos = blklist[i];
 			System.out.printf("  block at %08X\n", blkpos);
 			super.seek(blkpos);
-			loadBlock();
+			new MMCMPBlock(this, b);
 		}
 		
 		decompressing = false;
@@ -110,36 +111,90 @@ public class MMCMPUnpacker extends RandomAccessFile
 		throw new RuntimeException("TODO: finish off reverse-engineering this damn thing (MMCMP)");
 	}
 	
-	private void loadBlock() throws IOException
+	
+	private class MMCMPBlock
 	{
-		int opensize = Integer.reverseBytes(super.readInt());
-		int packsize = Integer.reverseBytes(super.readInt());
-		int checksum = Integer.reverseBytes(super.readInt());
-		int ccount = 0xFFFF&(int)Short.reverseBytes(super.readShort());
-		System.out.printf("    unpacked size:  %08X\n", opensize);
-		System.out.printf("    packed size:    %08X\n", packsize);
-		System.out.printf("    checksum:       %08X\n", checksum);
-		System.out.printf("    chunk count:    %04X\n", ccount);
+		private MMCMPUnpacker fp;
+		private byte[] b;
+		private byte[] cbuf;
+		private int[] hufftab_pos;
 		
-		int[][] clist = new int[ccount][2];
-		
-		int bunk3 = 0xFFFF&(int)Short.reverseBytes(super.readShort());
-		int bcount = 0xFFFF&(int)Short.reverseBytes(super.readShort());
-		int bcomp = 0xFFFF&(int)Short.reverseBytes(super.readShort());
-		System.out.printf("    unknown 3:      %04X\n", bunk3);
-		System.out.printf("    byte orderings: %04X\n", bcount);
-		System.out.printf("    compression:    %04X\n", bcomp);
-		
-		for(int i = 0; i < ccount; i++)
+		public MMCMPBlock(MMCMPUnpacker fp, byte[] b) throws IOException
 		{
-			int cptr = Integer.reverseBytes(super.readInt());
-			int clen = Integer.reverseBytes(super.readInt());
-			clist[i][0] = cptr;
-			clist[i][1] = clen;
-			System.out.printf("      chunk %d data: destpos=%08X destlen=%08X\n", i+1, cptr, clen);
+			this.fp = fp;
+			this.b = b;
+			this.cbuf = null;
+			loadBlock();
 		}
 		
-		this.cbuf = new byte[opensize];
+		private void loadBlock() throws IOException
+		{
+			int opensize = Integer.reverseBytes(fp.readInt());
+			int packsize = Integer.reverseBytes(fp.readInt());
+			int checksum = Integer.reverseBytes(fp.readInt());
+			int ccount = 0xFFFF&(int)Short.reverseBytes(fp.readShort());
+			System.out.printf("    unpacked size:  %08X\n", opensize);
+			System.out.printf("    packed size:    %08X\n", packsize);
+			System.out.printf("    checksum:       %08X\n", checksum);
+			System.out.printf("    chunk count:    %04X\n", ccount);
+			
+			int[][] clist = new int[ccount][2];
+			
+			int bcat = 0xFFFF&(int)Short.reverseBytes(fp.readShort());
+			int bcount = 0xFFFF&(int)Short.reverseBytes(fp.readShort());
+			int bcomp = 0xFFFF&(int)Short.reverseBytes(fp.readShort());
+			System.out.printf("    category:       %04X\n", bcat);
+			System.out.printf("    byte orderings: %04X\n", bcount);
+			System.out.printf("    compression:    %04X\n", bcomp);
+			
+			for(int i = 0; i < ccount; i++)
+			{
+				int cptr = Integer.reverseBytes(fp.readInt());
+				int clen = Integer.reverseBytes(fp.readInt());
+				clist[i][0] = cptr;
+				clist[i][1] = clen;
+				System.out.printf("      chunk %d data: destpos=%08X destlen=%08X\n", i+1, cptr, clen);
+			}
+			
+			this.cbuf = new byte[opensize];
+			
+			// load huffman table if necessary
+			hufftab_pos = new int[256];
+			if(bcount == 0)
+			{
+				for(int i = 0; i < 256; i++)
+					hufftab_pos[i] = i;
+			} else {
+				for(int i = 0; i < bcount; i++)
+					hufftab_pos[i] = fp.read();
+			}
+			
+			switch(bcomp)
+			{
+				case 0:
+					for(int i = 0; i < opensize; i++)
+						cbuf[i] = (byte)readHuffman();
+					break;
+				default:
+					System.out.printf("TODO: crack compression %d\n", bcomp);
+					break;
+			}
+			
+			// copy that crap across.
+			int p = 0;
+			for(int i = 0; i < ccount; i++)
+			{
+				int ptr = clist[i][0];
+				int len = clist[i][1];
+				for(int j = 0; j < len; j++,p++)
+					b[p] = cbuf[j];
+			}
+		}
 		
+		private int readHuffman() throws IOException
+		{
+			// TODO decompress properly
+			return fp.read();
+		}
 	}
 }
