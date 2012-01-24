@@ -119,25 +119,25 @@ public class Tracker extends JComponent
 		if(v <= 64)
 			return String.format("%02d", v);
 		else if(v <= 74)
-			return String.format("A%c", (v-65));
+			return String.format("A%c", '0'+(v-65));
 		else if(v <= 84)
-			return String.format("B%c", (v-75));
+			return String.format("B%c", '0'+(v-75));
 		else if(v <= 94)
-			return String.format("C%c", (v-85));
+			return String.format("C%c", '0'+(v-85));
 		else if(v <= 104)
-			return String.format("D%c", (v-95));
+			return String.format("D%c", '0'+(v-95));
 		else if(v <= 114)
-			return String.format("E%c", (v-105));
+			return String.format("E%c", '0'+(v-105));
 		else if(v <= 124)
-			return String.format("F%c", (v-115));
+			return String.format("F%c", '0'+(v-115));
 		else if(v < 128)
 			return "??";
 		else if(v <= 192)
-			return String.format("%02d", v); // TODO: denote this correctly!
+			return String.format("%02d", v-128); // TODO: denote this correctly!
 		else if(v <= 202)
-			return String.format("G%c", (v-193));
+			return String.format("G%c", '0'+(v-193));
 		else if(v <= 212)
-			return String.format("H%c", (v-203));
+			return String.format("H%c", '0'+(v-203));
 		else if(v == 255)
 			return "..";
 		else
@@ -155,14 +155,15 @@ public class Tracker extends JComponent
 	private int[] dcell = new int[5];
 	private void patternPane(Graphics g, int ystart, int yend)
 	{
-		int cssize = 4+3+3+4;
+		int cssize = 3+2+2+3  +1;
 		int widthChars = width/4;
 		int widthChannels = (widthChars-4)/cssize;
 		int heightChars = (yend-ystart)/6;
 		g.setColor(Color.BLACK);
 		
 		int offscol = 0;
-		int offsrow = patrow-heightChars/2;
+		int xoffsrow = heightChars/2;
+		int offsrow = patrow-xoffsrow;
 		
 		// TODO: room for track head
 		
@@ -200,7 +201,7 @@ public class Tracker extends JComponent
 						trk.getData(r, dcell);
 						
 						TrackerFont.FNT_XAIMUS.write(g,
-							String.format("%s %s %s %s%02X|"
+							String.format("%s%s%s%s%02X|"
 								,getStrNote(dcell[0])
 								,getStrIns(dcell[1])
 								,getStrVol(dcell[2])
@@ -208,10 +209,25 @@ public class Tracker extends JComponent
 								,dcell[4]
 									),
 							x, y);
+						
+						if(dcell[2] >= 128 && dcell[2] <= 192)
+						{
+							g.setXORMode(Color.BLACK);
+							g.setColor(Color.WHITE);
+							g.fillRect(x + 4*(3+2), y, 2*4, 5);
+							g.setPaintMode();
+							g.setColor(Color.BLACK);
+						}
 					}
 				}
 			}
 		}
+		
+		g.setXORMode(Color.BLACK);
+		g.setColor(Color.WHITE);
+		g.fillRect(4*4, ystart+6*xoffsrow, width-4*4, 5);
+		g.setPaintMode();
+		g.setColor(Color.BLACK);
 		
 		//g.fillRect(1, ystart+1, width-2, yend-ystart-2);
 	}
@@ -233,6 +249,7 @@ public class Tracker extends JComponent
 		for(int x = 0; x < 6; x++)
 		{
 			int rx = (x*width*2+1)/12;
+			int nrx = ((x+1)*width*2+1)/12;
 			
 			// TODO: put the proper listboxes in
 			// - using placeholder text for now
@@ -304,7 +321,15 @@ public class Tracker extends JComponent
 				TrackerFont.FNT_XAIMUS.write(g, " " + s, rx+2, ry);
 				
 				if(lbsel[x] == y)
-					g.fillRect(rx+2, ry+1, 3, 3);
+				{
+					//g.fillRect(rx+2, ry+1, 3, 3);
+					
+					g.setXORMode(Color.BLACK);
+					g.setColor(Color.WHITE);
+					g.fillRect(rx, ry, (nrx-rx), 5);
+					g.setPaintMode();
+					g.setColor(Color.BLACK);
+				}
 			}
 			
 			if(x != 0)
