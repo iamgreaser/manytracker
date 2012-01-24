@@ -20,9 +20,11 @@ public class TrackerFont
 		this.height = height;
 		try
 		{
-			this.img = ImageIO.read(new File(fname));
+			InputStream fp = getClass().getClassLoader().getResourceAsStream(fname);
+			this.img = ImageIO.read(fp);
 		} catch(IOException ex) {
 			// pass it on - can't run without a font.
+			System.err.printf("IOEXCEPTION\n");
 			throw new RuntimeException(ex);
 		}
 	}

@@ -57,4 +57,4 @@ so uh yeah, this is where it's at (or more likely where it WAS at, and I haven't
 --Ben "GreaseMonkey" Russell, 2012.
 
 to make a jar:
-jar -cf manytracker.jar -m META-INF/MANIFEST.MF */*.class >/dev/null
+jar -cf manytracker.jar -m META-INF/MANIFEST.MF */*.class data/*.bmp >/dev/null
