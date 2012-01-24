@@ -72,6 +72,7 @@ public class PlayerChannel
 	private int eff_vs = 0;
 	
 	private int eff_dxx_slide = 0;
+	private int eff_efxx_peradd = 0;
 	private int eff_efxx_slide = 0;
 	private int eff_gxx_slide = 0;
 	private boolean eff_hxx_fine = false;
@@ -175,6 +176,7 @@ public class PlayerChannel
 				last_note = per_targ_note;
 			}
 		}
+		per_out = per_note;
 	}
 	
 	private void doTremor()
@@ -295,11 +297,13 @@ public class PlayerChannel
 		int mul = down ? -1 : 1;
 		
 		if((mask & 0xF0) == 0xF0)
-			per_note = player.calcSlide16(per_note, (mask & 0x0F)*mul);
+			eff_efxx_peradd += (mask & 0x0F)*mul*4;
 		else if((mask & 0xF0) == 0xE0)
-			per_note = player.calcSlide64(per_note, (mask & 0x0F)*mul);
+			eff_efxx_peradd += (mask & 0x0F)*mul;
 		else
-			per_note = player.calcSlide16(per_note, mask*mul);
+			eff_efxx_peradd += mask*mul*4;
+		
+		per_out = per_note;
 	}
 	
 	private void doSlideEff(int mask, boolean down)
@@ -308,10 +312,11 @@ public class PlayerChannel
 		int mul = down ? -1 : 1;
 		
 		// fun bug in IT 2.08-2.09
-		if(player.getITVersion() < 0x210)
-			per_note = per_out;
-	
-		per_note = player.calcSlide16(per_note, mask*mul);
+		// TODO: move this code into the right place!
+		//if(player.getITVersion() < 0x210)
+		//	per_note = per_out;
+		
+		eff_efxx_peradd += (mask & 0x0F)*mul*4;
 	}
 	
 	private double getWaveform(int type, int offs)
@@ -389,6 +394,8 @@ public class PlayerChannel
 		pat_vol = vol;
 		pat_eft = eft;
 		pat_efp = efp;
+		
+		eff_efxx_peradd = 0;
 		
 		this.uoffs = 0;
 		
@@ -873,6 +880,10 @@ public class PlayerChannel
 			// note fade
 			noteFade();
 		}
+		
+		// update period if necessary
+		per_note = player.calcSlide64(per_note, eff_efxx_peradd);
+		per_out = player.calcSlide64(per_out, eff_efxx_peradd);
 	}
 	
 	private void changeVirtualSample(SessionSample csmp)
@@ -966,6 +977,8 @@ public class PlayerChannel
 	public void updateN()
 	{
 		checkVirtualChannel();
+		
+		eff_efxx_peradd = 0;
 		
 		if(pat_eft != 0x13 || (eff_sxx & 0xF0) != 0xD0)
 		{
@@ -1097,6 +1110,10 @@ public class PlayerChannel
 			// Hx vibrato
 			// TODO!
 		}
+		
+		// update period if necessary
+		per_note = player.calcSlide64(per_note, eff_efxx_peradd);
+		per_out = player.calcSlide64(per_out, eff_efxx_peradd);
 	}
 	
 	public void noteOff()
