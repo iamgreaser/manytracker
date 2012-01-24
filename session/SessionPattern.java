@@ -128,16 +128,36 @@ public class SessionPattern
 				
 				if((mask & 0x80) != 0)
 				{
-					// TODO: filter pattern data
 					ld[3] = fp.read();
 					ld[4] = fp.read();
 					
-					// ok apparently IT does this conversion
-					// so let's do the same damn thing
-					if(ld[3] == 0x18 && ld[4] == 0xA4)
+					
+					switch(ld[3])
 					{
-						ld[3] = 0x13;
-						ld[4] = 0x91;
+						case 0x16:
+							ld[4] *= 2;
+							break;
+						case 0x18:
+							// ok apparently IT does this conversion
+							// so let's do the same damn thing
+							if(ld[4] == 0xA4)
+							{
+								ld[3] = 0x13;
+								ld[4] = 0x91;
+							} else {
+								ld[3] = ld[4] = 0x00;
+							}
+							break;
+						// some crap that isn't used in S3M
+						case 0x0D: // no CJA, .s3m doesn't support channel volumes --GM
+						case 0x0E:
+						case 0x10:
+						case 0x17:
+						case 0x19:
+						case 0x1A:
+							ld[3] = ld[4] = 0x00;
+							break;
+						
 					}
 				}
 				

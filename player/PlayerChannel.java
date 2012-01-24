@@ -767,7 +767,7 @@ public class PlayerChannel
 		} 
 		
 		boolean porta_test_root = (pat_eft != 0x07 && pat_eft != 0x0C);
-		boolean porta_test = (isActive() || porta_test_root);
+		boolean porta_test = ((!isActive()) || porta_test_root);
 		
 		if(note < 120 && cins != null && porta_test)
 			triggerNNA();
