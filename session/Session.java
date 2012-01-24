@@ -215,6 +215,10 @@ public class Session
 		// load sample data
 		for(int i = 0; i < smpnum; i++)
 			map_smp.get((Integer)(i+1)).loadSampleDataMOD(fp);
+		
+		// set everything else!
+		this.flags = FLAG_COMPATGXX | FLAG_OLDEFFECTS | FLAG_STEREO | FLAG_VOL0MIX;
+		this.sep = 64;
 	}
 	
 	private void loadDataIT(RandomAccessFile fp) throws IOException

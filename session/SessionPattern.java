@@ -167,7 +167,7 @@ public class SessionPattern
 						break;
 					case 0xE:
 						eft = 0x13;
-						switch(efp&0xF0)
+						switch(efp>>4)
 						{
 							case 0x0:
 								break;
@@ -197,7 +197,8 @@ public class SessionPattern
 							case 0x8:
 								break;
 							case 0x9:
-								efp = (efp&15)|0x30;
+								eft = 0x11;
+								efp = (efp&15);
 								break;
 							case 0xA:
 								eft = 0x04;

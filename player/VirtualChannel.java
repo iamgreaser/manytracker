@@ -297,6 +297,9 @@ public class VirtualChannel
 		// load some things
 		
 		float[][] data = note_off ? csmp.getDataLoop() : csmp.getDataSustain();
+		if(data == null)
+			return;
+		
 		float[] dl = data[0];
 		float[] dr = data[1];
 		int length = data[0].length;

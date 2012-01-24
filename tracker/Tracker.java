@@ -340,4 +340,18 @@ public class Tracker extends JComponent
 		// blit
 		g.drawImage(buf, 0, 0, width, height, 0, 0, width, height, this);
 	}
+	
+	public static void main(String[] args) throws Exception
+	{
+		Tracker tracker = new Tracker(new Session(args[0]));
+		Player player = tracker.getPlayer();
+		
+		player.playFromStart();
+		while(true)
+		{
+			player.tick();
+			tracker.repaint();
+			Thread.yield();
+		}
+	}
 }

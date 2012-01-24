@@ -8,15 +8,12 @@ public class Main
 {
 	public static void main(String[] args) throws Exception
 	{
-		//Player player = new Player(new Session(args[0]));
-		Tracker tracker = new Tracker(new Session(args[0]));
-		Player player = tracker.getPlayer();
+		Player player = new Player(new Session(args[0]));
 		
 		player.playFromStart();
 		while(true)
 		{
 			player.tick();
-			tracker.repaint();
 			Thread.yield();
 		}
 	}
