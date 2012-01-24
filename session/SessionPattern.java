@@ -22,11 +22,223 @@ public class SessionPattern
 	}
 	*/
 	
+	// format bollocks
+	
+	public static final int FORMAT_IT = 1;
+	public static final int FORMAT_MOD = 2;
+	
+	// pattern info
+	
 	private int rows;
 	private SessionTrack[] tracks;
 	private int[] tidx;
 	
-	public SessionPattern(Session session, RandomAccessFile fp) throws IOException
+	public SessionPattern(Session session, RandomAccessFile fp, int format) throws IOException
+	{
+		switch(format)
+		{
+			case FORMAT_IT:
+				loadDataIT(session, fp);
+				break;
+			case FORMAT_MOD:
+				throw new RuntimeException("incorrect constructor for pattern format");
+			default:
+				throw new RuntimeException("pattern format not supported");
+		}
+	}
+	
+	public SessionPattern(Session session, RandomAccessFile fp, int format, int secondary) throws IOException
+	{
+		switch(format)
+		{
+			case FORMAT_MOD:
+				loadDataMOD(session, fp, secondary);
+				break;
+			case FORMAT_IT:
+				throw new RuntimeException("incorrect constructor for pattern format");
+			default:
+				throw new RuntimeException("pattern format not supported");
+		}
+	}
+	
+	private void loadDataMOD(Session session, RandomAccessFile fp, int chncount) throws IOException
+	{
+		this.tracks = new SessionTrack[64];
+		this.rows = 64;
+		
+		for(int c = 0; c < chncount; c++)
+		{
+			tracks[c] = new SessionTrack(rows);
+		}
+		
+		int[] ld = new int[5];
+		
+		for(int r = 0; r < 64; r++)
+		{
+			for(int c = 0; c < chncount; c++)
+			{
+				ld[0] = 253;
+				ld[2] = 255;
+				ld[1] = ld[3] = ld[4] = 0;
+				
+				int per = fp.readUnsignedShort();
+				int eff = fp.readUnsignedShort();
+				int ins = ((per>>8)&0xF0)|(eff>>12);
+				per &= 0xFFF;
+				eff &= 0xFFF;
+				int tent_eft = eff>>8;
+				int efp = eff&0xFF;
+				
+				if(per != 0)
+				{
+					// HA! HA! I'm using MATHEMATICS
+					int note = (int)(12.0f*Math.log(428.0f/((float)per))/Math.log(2.0)+60+0.5);
+					if(note < 0 || note >= 120)
+						note = 253;
+					ld[0] = note;
+				}
+				
+				int eft = 0;
+				
+				switch(tent_eft)
+				{
+					case 0x0:
+						if(efp != 0)
+							eft = 0x0A;
+						break;
+					case 0x1:
+						if(efp != 0)
+							eft = 0x06;
+						if(efp > 0xDF)
+							efp = 0xDF;
+						break;
+					case 0x2:
+						if(efp != 0)
+							eft = 0x05;
+						if(efp > 0xDF)
+							efp = 0xDF;
+						break;
+					case 0x3:
+						eft = 0x07;
+						break;
+					case 0x4:
+						eft = 0x08;
+						break;
+					case 0x5:
+						if(efp != 0)
+							eft = 0x0C;
+						else
+							eft = 0x07;
+						break;
+					case 0x6:
+						if(efp != 0)
+							eft = 0x0B;
+						else
+							eft = 0x08;
+						break;
+					case 0x7:
+						if(efp != 0)
+							eft = 0x12;
+						break;
+					case 0x8:
+						eft = 0x18;
+						break;
+					case 0x9:
+						// XXX: should this behave like PT1.x?
+						// (PT1.x adds instead of sets the offset.)
+						eft = 0x0F;
+						break;
+					case 0xA:
+						if(efp != 0)
+							eft = 0x04;
+						break;
+					case 0xB:
+						eft = 0x02;
+						break;
+					case 0xC:
+						if(efp <= 64)
+							ld[2] = efp;
+						efp = 0;
+						break;
+					case 0xD:
+						eft = 0x03;
+						// THIS IS STUPID
+						efp = (efp>>4)*10+(efp&15);
+						break;
+					case 0xE:
+						eft = 0x13;
+						switch(efp&0xF0)
+						{
+							case 0x0:
+								break;
+							case 0x1:
+								eft = 0x06;
+								efp = (efp&15)|0xF0;
+								break;
+							case 0x2:
+								eft = 0x05;
+								efp = (efp&15)|0xF0;
+								break;
+							case 0x3:
+								efp = (efp&15)|0x10;
+								break;
+							case 0x4:
+								efp = (efp&15)|0x30;
+								break;
+							case 0x5:
+								efp = (efp&15)|0x20;
+								break;
+							case 0x6:
+								efp = (efp&15)|0xB0;
+								break;
+							case 0x7:
+								efp = (efp&15)|0x40;
+								break;
+							case 0x8:
+								break;
+							case 0x9:
+								efp = (efp&15)|0x30;
+								break;
+							case 0xA:
+								eft = 0x04;
+								efp = ((efp&15)<<4)|0x0F;
+								break;
+							case 0xB:
+								eft = 0x04;
+								efp = (efp&15)|0xF0;
+								break;
+							case 0xC:
+								break;
+							case 0xD:
+								break;
+							case 0xE:
+								break;
+							case 0xF:
+								efp = 0;// funkrepeat not supported nor allocated!
+								break;
+							
+						}
+						break;
+					case 0xF:
+						if(efp < 0x20)
+							eft = 0x01;
+						else
+							eft = 0x14;
+						break;
+					
+				}
+				ld[1] = ins;
+				ld[3] = eft;
+				ld[4] = efp;
+				
+				tracks[c].setData(r, ld);
+			}
+		}
+		
+		tidx = session.addTracks(tracks);
+	}
+	
+	private void loadDataIT(Session session, RandomAccessFile fp) throws IOException
 	{
 		int size = 0xFFFF&(int)Short.reverseBytes(fp.readShort());
 		this.rows = 0xFFFF&(int)Short.reverseBytes(fp.readShort());

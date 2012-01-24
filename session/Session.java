@@ -8,6 +8,11 @@ import java.util.*;
 
 public class Session
 {
+	// format bollocks
+	
+	public static final int FORMAT_IT = 1;
+	public static final int FORMAT_MOD = 2;
+	
 	// network bollocks
 	private ArrayList<SessionUser> users = new ArrayList<SessionUser>();
 	
@@ -88,8 +93,133 @@ public class Session
 		
 		// Load IMPM header
 		fp.read(b, 0, 4);
-		if(b[0] != 'I' || b[1] != 'M' || b[2] != 'P' || b[3] != 'M')
-			throw new RuntimeException("not an IMPM module");
+		if(b[0] == 'I' || b[1] == 'M' || b[2] == 'P' || b[3] == 'M')
+		{
+			loadDataIT(fp);
+			return;
+		}
+		
+		fp.seek(0);
+		
+		// Assume this is a .mod file
+		if(true)
+		{
+			loadDataMOD(fp);
+			return;
+		}
+		
+		throw new RuntimeException("module format not supported");
+	}
+	
+	private void loadDataMOD(RandomAccessFile fp) throws IOException
+	{
+		byte[] b = new byte[23];
+		
+		this.name = Util.readStringNoNul(fp, b, 20);
+		System.out.printf("name: \"%s\"\n", name);
+		
+		// check to see if we're a 15-sampler
+		fp.seek(20+15*30+1);
+		boolean poss_15smp = (fp.read() == (byte)0x78);
+		
+		// get M.K. tag
+		fp.seek(20+31*30+1+1+128);
+		String mktag = Util.readStringNoNul(fp, b, 4);
+		
+		// set us up for reading interesting things
+		int smpnum = 31;
+		int chnnum = 4;
+		boolean flt8 = false;
+		
+		// check mktag for gibberish
+		for(int i = 0; i < 4; i++)
+		{
+			//System.out.printf("%d\n",b[i]);
+			if(b[i] < 0x20 || b[i] > 0x7E)
+			{
+				if(!poss_15smp)
+					throw new RuntimeException("not a 15-sample or 31-sample MOD");
+				
+				smpnum = 15;
+				break;
+			}
+		}
+		
+		if(mktag.equals("FLT8"))
+		{
+			flt8 = true;
+		} else if(mktag.substring(1,4).equals("CHN")) {
+			// check values
+			int cct = b[0] - '0';
+			if(cct >= 1 && cct <= 9)
+				chnnum = cct;
+		} else if(mktag.substring(2,4).equals("CH")
+			|| mktag.substring(2,4).equals("CN")
+				) {
+			// check values
+			int cct1 = b[0] - '0';
+			int cct2 = b[1] - '0';
+			if(cct1 >= 0 && cct1 <= 9)
+				if(cct2 >= 0 && cct2 <= 9)
+				{
+					int cct = cct1*10+cct2;
+					
+					if(cct >= 1)
+						chnnum = cct;
+				}
+		}
+		
+		// I forget what else is used.
+		
+		if(chnnum > 64)
+			throw new RuntimeException(String.format("%d-channel modules not supported (max 64)",chnnum));
+		
+		if(flt8)
+			throw new RuntimeException("TODO: FLT8 loader");
+		
+		// continue
+		fp.seek(20);
+		
+		// load sample headers
+		for(int i = 0; i < smpnum; i++)
+			map_smp.put((Integer)(i+1), new SessionSample(fp, SessionSample.FORMAT_MOD));
+		
+		// load order count
+		int ordnum = fp.read();
+		
+		// ignore this next byte (well, at least for now)
+		fp.read();
+		
+		// load orderlist + calculate patnum
+		int patnum = 0;
+		for(int i = 0; i < 128; i++)
+		{
+			int v = orderlist[i] = fp.read();
+			
+			if(v > patnum)
+				patnum = v;
+		}
+		patnum++;
+		
+		// fix up orderlist
+		for(int i = ordnum; i < 256; i++)
+			orderlist[i] = 255;
+		
+		// skip M.K. tag
+		fp.readInt();
+		
+		// load patterns
+		for(int i = 0; i < patnum; i++)
+			map_pat.put((Integer)i, new SessionPattern(this, fp, SessionPattern.FORMAT_MOD, chnnum));
+		
+		// load sample data
+		for(int i = 0; i < smpnum; i++)
+			map_smp.get((Integer)(i+1)).loadSampleDataMOD(fp);
+	}
+	
+	private void loadDataIT(RandomAccessFile fp) throws IOException
+	{
+		byte[] b = new byte[26];
 		
 		this.name = Util.readString(fp, b, 26);
 		System.out.printf("name: \"%s\"\n", name);
@@ -155,7 +285,7 @@ public class Session
 			if(smpptrs[i] != 0)
 			{
 				fp.seek(smpptrs[i]);
-				map_smp.put((Integer)(i+1), new SessionSample(fp));
+				map_smp.put((Integer)(i+1), new SessionSample(fp, SessionSample.FORMAT_IT));
 			}
 		}
 		
@@ -164,7 +294,7 @@ public class Session
 			if(patptrs[i] != 0)
 			{
 				fp.seek(patptrs[i]);
-				map_pat.put((Integer)i, new SessionPattern(this, fp));
+				map_pat.put((Integer)i, new SessionPattern(this, fp, SessionPattern.FORMAT_IT));
 			}
 		}
 		

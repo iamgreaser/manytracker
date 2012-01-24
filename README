@@ -24,6 +24,7 @@ it has:
 - PERFECT* Ixx IMPLEMENTATION! (* i might be wrong - it passes the Storlek tests though)
 - correct instrument envelope looping! (none of this XM-y bollocks)
 - voleffects!
+- mod loader! probably still has bugs.
 
 and finally:
 - *PLENTY* of bugs!
@@ -38,7 +39,7 @@ it doesn't quite have:
 it lacks:
 - any form of input that isn't alt-f4, that X, or ctrl-c
 - any form of networking
-- non-.it loaders
+- s3m/xm loaders (but I'll be keen to avoid XM for as long as I can!)
 - a file saver
 - all the panes that aren't the pattern pane
 - embedded MIDI loading / timestamp crap

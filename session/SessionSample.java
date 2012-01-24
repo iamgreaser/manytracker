@@ -7,6 +7,11 @@ import java.io.*;
 
 public class SessionSample
 {
+	// format bollocks
+	
+	public static final int FORMAT_IT = 1;
+	public static final int FORMAT_MOD = 2;
+	
 	// IMPS bollocks
 	
 	public static final int SFLG_EXISTS = 0x01;
@@ -45,7 +50,73 @@ public class SessionSample
 	private float[][] dataSustain = null;
 	private float[][] dataLoop = null;
 	
-	public SessionSample(RandomAccessFile fp) throws IOException
+	public SessionSample(RandomAccessFile fp, int format) throws IOException
+	{
+		switch(format)
+		{
+			case FORMAT_IT:
+				loadDataIT(fp);
+				break;
+			case FORMAT_MOD:
+				loadDataMOD(fp);
+				break;
+			default:
+				throw new RuntimeException("sample format not supported");
+		}
+	}
+	
+	public void loadSampleDataMOD(RandomAccessFile fp) throws IOException
+	{
+		if(length == 0)
+			return;
+		
+		// this part's pretty easy really.
+		data = new float[2][];
+		float[] xdata = new float[length];
+		
+		for(int i = 0; i < length; i++)
+		{
+			int v = fp.read();
+			if(v == -1)
+				v = 0;
+			if(v >= 0x80)
+				v -= 0x100;
+			
+			float fv = (float)v / 128.0f;
+			xdata[i] = fv;
+		}
+		
+		// TODO: append MOD loop to end
+		
+		data[0] = data[1] = xdata;
+		
+		unrollLoops();
+	}
+	
+	public void loadDataMOD(RandomAccessFile fp) throws IOException
+	{
+		byte[] b = new byte[23];
+		
+		this.name = Util.readStringNoNul(fp, b, 22);
+		System.out.printf("sample name \"%s\"\n", name);
+		
+		this.length = 2*(int)fp.readUnsignedShort();
+		int ft = fp.read();
+		this.vol = fp.read();
+		this.lpbeg = 2*(int)fp.readUnsignedShort();
+		this.lplen = 2*(int)fp.readUnsignedShort();
+		
+		if(length != 0)
+			flg |= SFLG_EXISTS;
+		if(lplen > 2)
+			flg |= SFLG_LOOP;
+		
+		cvt = SCVT_SIGNED;
+		
+		c5speed = 8363; // TODO: finetune
+	}
+	
+	public void loadDataIT(RandomAccessFile fp) throws IOException
 	{
 		byte[] b = new byte[26];
 		fp.read(b, 0, 4);
@@ -103,11 +174,28 @@ public class SessionSample
 	
 	private void unrollLoops()
 	{
+		//System.out.printf("WORK %d %d %d\n", length, lpbeg, lplen);
 		if(data == null)
 		{
 			dataLoop = data;
 			dataSustain = data;
 			return;
+		}
+		
+		if(lpbeg+lplen > length)
+			lplen = length-lpbeg;
+		if(lplen <= 0)
+		{
+			lplen = 0;
+			flg &= ~(SFLG_LOOP|SFLG_BIDI);
+		}
+		
+		if(susbeg+suslen > length)
+			suslen = length-susbeg;
+		if(suslen <= 0)
+		{
+			suslen = 0;
+			flg &= ~(SFLG_SUSLOOP|SFLG_SUSBIDI);
 		}
 		
 		dataLoop = unrollLoop(lpbeg, lplen, (flg & SFLG_LOOP) != 0, (flg & SFLG_BIDI) != 0);
