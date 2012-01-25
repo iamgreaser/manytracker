@@ -202,6 +202,7 @@ public class SessionInstrument
 			
 			// TODO look into the REALLY SCARY STUFF pertaining to sustain + loop --GM
 			
+			System.out.printf("%d %d %d %d\n",lpb,lpe,slb,xmflg);
 			if((xmflg & 0x01) != 0)
 				this.flg |= EFLG_ON;
 			if((xmflg & 0x02) != 0)

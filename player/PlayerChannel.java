@@ -833,6 +833,7 @@ public class PlayerChannel
 		{
 			//setNoteTargetByNumber(note);
 			setNoteTargetByNumber(unote);
+			
 			if(porta_test && csmp != null)
 			{
 				retrigNote();
@@ -865,6 +866,13 @@ public class PlayerChannel
 				
 				if(porta_test_root)
 					latchNoteSpeed();
+			} else if(player.hasCompatGxx()) {
+				if(env_vol != null)
+					env_vol.retrig();
+				if(env_pan != null)
+					env_pan.retrig();
+				if(env_per != null)
+					env_per.retrig();
 			}
 			
 			System.out.printf("note start %d %d %d\n", note, per_note, smp_idx);

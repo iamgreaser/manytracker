@@ -121,7 +121,7 @@ public class SessionSample
 		if(this.length != 0)
 		{
 			this.flg = SFLG_EXISTS;
-			this.cvt = SCVT_SIGNED | SCVT_BYTEDELTA;
+			this.cvt = SCVT_SIGNED | SCVT_DELTA;
 			
 			if(lplen != 0)
 			{
@@ -145,6 +145,8 @@ public class SessionSample
 			{
 				this.flg |= SFLG_16BIT;
 				this.length /= 2;
+				this.lpbeg /= 2;
+				this.lplen /= 2;
 			}
 		}
 		
@@ -493,6 +495,7 @@ public class SessionSample
 		// byte delta -> straight
 		// y'know, that format they used in XM.
 		// oh wait, no, you shouldn't know that STAY THE HELL AWAY FROM XM IT'S BAD FOR YOU
+		// UPDATE: Triton are a bunch of FILTHY LIARS (they use proper delta for 16-bit samples). --GM
 		if((cvt & SCVT_BYTEDELTA) != 0)
 		{
 			int v = 0;
