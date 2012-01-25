@@ -47,6 +47,7 @@ public class PlayerChannel
 	private int filt_res = 0;
 	
 	private int last_note = 253;
+	private boolean last_note_was_cut = true;
 	
 	private int pat_note = 0;
 	private int pat_ins = 0;
@@ -806,7 +807,10 @@ public class PlayerChannel
 		}
 		
 		if(note < 120)
+		{
 			last_note = note;
+			last_note_was_cut = false;
+		}
 		
 		if(((ins != 0 && note != 255) || note < 120) && last_note < 120)
 		{
@@ -855,7 +859,7 @@ public class PlayerChannel
 				vol_out = vol_note;
 		}
 		
-		if(note < 120 || (note != 254 && smpchange))
+		if(note < 120 || (note != 254 && (smpchange || (ins != 0 && !last_note_was_cut))))
 		{
 			//setNoteTargetByNumber(note);
 			setNoteTargetByNumber(unote);
@@ -913,6 +917,7 @@ public class PlayerChannel
 		} else if(note == 254) {
 			// note cut
 			noteCut();
+			last_note_was_cut = true;
 		} else if(note != 253) {
 			// note fade
 			noteFade();

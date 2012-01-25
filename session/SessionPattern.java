@@ -253,7 +253,7 @@ public class SessionPattern
 					case 0x0C:
 						// TODO transfer this cleanly
 						if(ld[4] <= 0x40)
-							ld[2] = 0x10 + ld[4];
+							ld[2] = ld[4];
 						ld[3] = 0;
 						ld[4] = 0;
 						break;
