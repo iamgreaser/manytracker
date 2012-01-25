@@ -4,6 +4,12 @@ import java.io.*;
 
 public class Util
 {
+	public static double getWaveform(int type, int offs)
+	{
+		// TODO: types that aren't 0
+		return -Math.sin((offs&255)*Math.PI/128.0);
+	}
+	
 	public static String readString(RandomAccessFile fp, byte[] b, int len) throws IOException
 	{
 		int i = 0;

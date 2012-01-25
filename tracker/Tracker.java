@@ -8,7 +8,7 @@ import java.awt.event.*;
 import java.awt.image.*;
 import javax.swing.*;
 
-public class Tracker extends JComponent
+public class Tracker extends JComponent implements KeyListener, MouseListener, MouseMotionListener
 {
 	public static enum PaneSelection
 	{
@@ -365,6 +365,23 @@ public class Tracker extends JComponent
 		// blit
 		g.drawImage(buf, 0, 0, width, height, 0, 0, width, height, this);
 	}
+	
+	// useless pieces of crap
+	public void keyTyped(KeyEvent ev) {}
+	public void mouseClicked(MouseEvent ev) {}
+	
+	// key stuff
+	public void keyPressed(KeyEvent ev) {}
+	public void keyReleased(KeyEvent ev) {}
+	
+	// mouse stuff
+	public void mousePressed(MouseEvent ev) {}
+	public void mouseReleased(MouseEvent ev) {}
+	public void mouseEntered(MouseEvent ev) {}
+	public void mouseExited(MouseEvent ev) {}
+	public void mouseMoved(MouseEvent ev) {}
+	public void mouseDragged(MouseEvent ev) {}
+	
 	
 	public static void main(String[] args) throws Exception
 	{

@@ -831,6 +831,26 @@ public class SessionSample
 		return this.length;
 	}
 	
+	public int getVibSpeed()
+	{
+		return this.vis;
+	}
+	
+	public int getVibDepth()
+	{
+		return this.vid;
+	}
+	
+	public int getVibRate()
+	{
+		return this.vir;
+	}
+	
+	public int getVibType()
+	{
+		return this.vit;
+	}
+	
 	// setters
 	
 	public void setSampleVibrato(int vis, int vid, int vir, int vit)

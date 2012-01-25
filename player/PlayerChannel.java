@@ -1,5 +1,6 @@
 package player;
 
+import misc.Util;
 import session.*;
 
 public class PlayerChannel
@@ -34,6 +35,8 @@ public class PlayerChannel
 	private float vol_calculated = 1.0f;
 	
 	private int pan_chn = 32;
+	private int pan_swing = 0;
+	private int pan_note = 0;
 	
 	private int per_note = 8363;
 	private int per_targ = 8363;
@@ -319,17 +322,11 @@ public class PlayerChannel
 		eff_efxx_peradd += (mask & 0x0F)*mul*4;
 	}
 	
-	private double getWaveform(int type, int offs)
-	{
-		// TODO: types that aren't 0
-		return -Math.sin((offs&255)*Math.PI/128.0);
-	}
-	
 	public void doVibrato(int mask, boolean fine)
 	{
 		// TODO: read vibrato waveform
 		
-		double amp = getWaveform(0, eff_hxx_offs)*(mask&15);
+		double amp = Util.getWaveform(0, eff_hxx_offs)*(mask&15);
 		
 		if(player.hasOldEffects())
 			amp *= 2.0;
@@ -370,8 +367,27 @@ public class PlayerChannel
 			return;
 		
 		calculateVol();
+		
+		int pan_ins = pan_chn;
+		if(cins != null)
+		{
+			if((cins.getDefaultPan() & 0x80) == 0)
+				pan_ins = (cins.getDefaultPan() & 0x7F);
+			
+			pan_ins += (pan_note-cins.getPitchPanCentre())*cins.getPitchPanSep()/8;
+			pan_ins += pan_swing;
+			
+			//System.out.printf("%d %d %d\n", pan_chn, pan_swing, pan_ins);
+		}
+		
+		
+		if(pan_ins < 0)
+			pan_ins = 0;
+		if(pan_ins > 64)
+			pan_ins = 64;
+		
 		vchn.importVol(getCalculatedVol());
-		vchn.importPan(pan_chn);
+		vchn.importPan(pan_ins);
 		vchn.importPer(per_out);
 		vchn.importFilt(filt_chn, filt_res);
 	}
@@ -825,6 +841,16 @@ public class PlayerChannel
 		if(ins != 0 && vol > (player.getITVersion() < 0x208 ? 127 : 64) && csmp != null)
 		{
 			vol_note = csmp.getVol();
+			
+			if(cins != null)
+			{
+				vol_note += (int)(cins.getVolSwing()*(Math.random()*2.0-1.0)+0.5);
+				if(vol_note < 0)
+					vol_note = 0;
+				if(vol_note > 64)
+					vol_note = 64;
+			}
+			
 			if(unlockvol)
 				vol_out = vol_note;
 		}
@@ -843,8 +869,11 @@ public class PlayerChannel
 				
 				if(cins != null)
 				{
-					if((cins.getDefaultPan() & 0x80) == 0)
-						pan_chn = (cins.getDefaultPan() & 0x7F);
+					pan_swing = 0;
+					pan_note = unote;
+					
+					if(env_vol == null || !env_vol.isOn())
+						pan_swing = (int)(cins.getPanSwing()*(Math.random()*2.0-1.0)+0.5);
 					
 					if(env_vol != null)
 						env_vol.retrig();

@@ -314,10 +314,15 @@ public class Player
 		return calcSlide64(base, amt*4);
 	}
 	
+	public int calcSlide64IT(int base, int amt)
+	{
+		return (int)(0.5 + base * Math.pow(2.0f, amt / (64.0f * 12.0f)));
+	}
+	
 	public int calcSlide64(int base, int amt)
 	{
 		if(hasLinearSlides())
-			return (int)(0.5 + base * Math.pow(2.0f, amt / (64.0f * 12.0f)));
+			return calcSlide64IT(base, amt);
 		else {
 			int amiclk = 8363*428*4;
 			

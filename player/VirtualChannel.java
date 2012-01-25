@@ -1,5 +1,6 @@
 package player;
 
+import misc.Util;
 import session.*;
 
 public class VirtualChannel
@@ -48,6 +49,10 @@ public class VirtualChannel
 	
 	private int per_import = 0;
 	private int per_env = 32;
+	private int per_svib = 0;
+	
+	private int svib_offs = 0;
+	private int svib_rateacc = 0;
 	
 	private int filt_import = 127;
 	private int filt_env = 64;
@@ -166,6 +171,24 @@ public class VirtualChannel
 		if(!active)
 			return;
 		
+		if(csmp != null)
+		{
+			double amp = Util.getWaveform(csmp.getVibType(), svib_offs);
+			if(player.hasOldEffects())
+				amp *= 2.0;
+			amp *= ((csmp.getVibDepth() * (svib_rateacc>>8))>>8);
+			per_svib = (int)(amp+0.5);
+			
+			svib_offs += csmp.getVibSpeed();
+			svib_offs &= 255;
+			svib_rateacc += csmp.getVibRate();
+			if(svib_rateacc > 0xFFFF)
+				svib_rateacc = 0xFF00;
+			
+			//if(svib_offs != 0)
+			//	System.out.printf("%02X %04X %.5f\n", svib_offs, svib_rateacc, amp);
+		}
+		
 		if(env_vol != null)
 			vol_env = env_vol.read();
 		if(env_pan != null)
@@ -263,6 +286,8 @@ public class VirtualChannel
 		
 		// calculate main speed
 		int base_spd_c = player.calcSlide2(per_import, (per_env-32));
+		base_spd_c = player.calcSlide64IT(per_import, per_svib);
+		
 		float base_spd_x = (float)base_spd_c / (float)player.getFreq();
 		
 		// FIXME: this really should handle this case more gracefully!
@@ -522,8 +547,18 @@ public class VirtualChannel
 		note_fade = false;
 		vol_fadeout = 1024;
 		
+		if(cins != null)
+		{
+			per_env = 32;
+			pan_env = 32;
+			vol_env = 64;
+		}
+		
 		if(csmp == null)
 			return;
+		
+		svib_rateacc = 0;
+		svib_offs = 0;
 		
 		active = mixing = true;
 		

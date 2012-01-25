@@ -92,6 +92,11 @@ public class SessionInstrument
 				return (env.flg & EFLG_FILTER) != 0;
 			}
 			
+			public boolean isOn()
+			{
+				return (env.flg & EFLG_ON) != 0;
+			}
+			
 			public int read()
 			{
 				if((env.flg & EFLG_ON) == 0)
@@ -508,8 +513,8 @@ public class SessionInstrument
 		this.ppc = fp.read();
 		this.gbv = fp.read();
 		this.dfp = fp.read();
-		this.rv = fp.read();
-		this.rp = fp.read();
+		this.rv = (int)fp.readByte();
+		this.rp = (int)fp.readByte();
 		fp.readInt();
 		this.name = Util.readString(fp, b, 26);
 		
@@ -561,6 +566,26 @@ public class SessionInstrument
 	public int getDefaultResonance()
 	{
 		return this.ifr;
+	}
+	
+	public int getPitchPanSep()
+	{
+		return this.pps;
+	}
+	
+	public int getPitchPanCentre()
+	{
+		return this.ppc;
+	}
+	
+	public int getVolSwing()
+	{
+		return this.rv;
+	}
+	
+	public int getPanSwing()
+	{
+		return this.rp;
 	}
 	
 	public Envelope.Handle getVolEnvHandle()
