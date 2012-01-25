@@ -13,6 +13,7 @@ public class Session
 	public static final int FORMAT_IT = 1;
 	public static final int FORMAT_MOD = 2;
 	public static final int FORMAT_S3M = 3;
+	public static final int FORMAT_XM = 4;
 	
 	// network bollocks
 	private ArrayList<SessionUser> users = new ArrayList<SessionUser>();
@@ -100,6 +101,19 @@ public class Session
 			return;
 		}
 		
+		// Attempt to load XM
+		fp.seek(0);
+		if(Util.readStringNoNul(fp,b,17).equals("Extended Module: "))
+		{
+			fp.seek(17+20);
+			if(fp.read() == 0x1A)
+			{
+				fp.seek(17);
+				loadDataXM(fp);
+				return;
+			}
+		}
+		
 		// Attempt to load ST3 module
 		fp.seek(0x1C);
 		if(fp.readUnsignedShort() == 0x1A10)
@@ -119,6 +133,68 @@ public class Session
 		}
 		
 		throw new RuntimeException("module format not supported");
+	}
+	
+	private void loadDataXM(RandomAccessFile fp) throws IOException
+	{
+		byte[] b = new byte[20];
+		
+		// WHY THE HELL AM I DOING THIS
+		name = Util.readStringNoNul(fp, b, 20);
+		System.out.printf("name: \"%s\"\n", name);
+		fp.read(); // skip 0x1A byte
+		
+		// THIS CAN'T BE HAPPENING
+		fp.read(b, 0, 20); // skip tracker name
+		
+		// OH HELL NO
+		int xmver = 0xFFFF&(int)Short.reverseBytes(fp.readShort());
+		System.out.printf("XM version: %04X\n", xmver);
+		
+		// WHAT IS THIS CRAP
+		InhibitedFileBlock ifb = new InhibitedFileBlock(fp, Integer.reverseBytes(fp.readInt())-4);
+		
+		// HELP ME PLEASE
+		int ordnum = 0xFFFF&(int)Short.reverseBytes(ifb.readShort());
+		int respos = 0xFFFF&(int)Short.reverseBytes(ifb.readShort()); // can't be bothered right now --GM
+		int chnnum = 0xFFFF&(int)Short.reverseBytes(ifb.readShort()); // yeah sure, allow out of range values
+		if(chnnum > 64)
+			throw new RuntimeException(String.format("%d-channel modules not supported (max 64)",chnnum));
+		int patnum = 0xFFFF&(int)Short.reverseBytes(ifb.readShort());
+		int insnum = 0xFFFF&(int)Short.reverseBytes(ifb.readShort());
+		int xmflags = 0xFFFF&(int)Short.reverseBytes(ifb.readShort());
+		int xmspeed = 0xFFFF&(int)Short.reverseBytes(ifb.readShort());
+		int xmtempo = 0xFFFF&(int)Short.reverseBytes(ifb.readShort());
+		
+		// OH PLEASE, STOP IT
+		if(ordnum > 255)
+			ordnum = 255;
+		if(xmtempo > 255)
+			xmtempo = 255;
+		if(xmspeed > 255)
+			xmspeed = 255;
+		this.bpm = xmtempo;
+		this.spd = xmspeed;
+		this.flags = FLAG_COMPATGXX | FLAG_OLDEFFECTS | FLAG_INSMODE
+			| FLAG_STEREO | FLAG_VOL0MIX;
+		
+		if((xmflags & 0x01) != 0)
+			this.flags |= FLAG_LINEAR;
+		
+		// NONONONONONO
+		System.out.printf("chn=%d ordnum=%d tempo=%d speed=%s\n", chnnum, ordnum,xmtempo,xmspeed);
+		for(int i = 0; i < 256; i++)
+			orderlist[i] = ifb.read();
+		for(int i = ordnum; i < 256; i++)
+			orderlist[i] = 255;
+		
+		ifb.done();
+		
+		// SAVE ME PLEEEEEAAASSSSEEEE
+		for(int i = 0; i < patnum; i++)
+			map_pat.put((Integer)i, new SessionPattern(this, fp, SessionPattern.FORMAT_XM, chnnum));
+		for(int i = 0; i < insnum; i++)
+			map_ins.put((Integer)(i+1), new SessionInstrument(fp, SessionInstrument.FORMAT_XM, this));
 	}
 	
 	private void loadDataS3M(RandomAccessFile fp) throws IOException
@@ -455,6 +531,30 @@ public class Session
 			{
 				ret[j] = i;
 				map_trk.put((Integer)i, trks[j]);
+				j++;
+			}
+		}
+		
+		return ret;
+	}
+	
+	public int[] addSamples(SessionSample ... smps)
+	{
+		int[] ret = new int[smps.length];
+		
+		wind: for(int i = 1, j = 0; i <= 0xFF && j < smps.length; i++)
+		{
+			while(smps[j] == null)
+			{
+				j++;
+				if(j >= smps.length)
+					break wind;
+			}
+			
+			if(map_smp.get((Integer)i) == null)
+			{
+				ret[j] = i;
+				map_smp.put((Integer)i, smps[j]);
 				j++;
 			}
 		}

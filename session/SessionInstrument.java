@@ -156,9 +156,59 @@ public class SessionInstrument
 				case FORMAT_IT200:
 					loadITv2(fp);
 					break;
+				case FORMAT_XM:
+					throw new RuntimeException("incorrect constructor for envelope format");
 				default:
 					throw new RuntimeException("instrument envelope format not supported");
 			}
+		}
+		
+		public Envelope(int[] data, int format) throws IOException
+		{
+			switch(format)
+			{
+				case FORMAT_XM:
+					loadXM(data);
+					break;
+				case FORMAT_IT100:
+				case FORMAT_IT200:
+					throw new RuntimeException("incorrect constructor for envelope format");
+				default:
+					throw new RuntimeException("instrument envelope format not supported");
+			}
+		}
+		
+		private void loadXM(int[] data)
+		{
+			// TODO some of the weird crap required because some things just suck
+			// (i recall browsing through MikMod's XM loader and some of the comments stuck out)
+			//  --GM
+			
+			this.num = data[48];
+			
+			for(int i = 0; i < 12; i++)
+			{
+				points[i][1] = (int)(short)(data[4*i+0]|(data[4*i+1]<<8));
+				points[i][0] = (int)(short)(data[4*i+2]|(data[4*i+3]<<8));
+			}
+			
+			this.lpb = data[50];
+			this.lpe = data[51];
+			this.slb = data[49];
+			this.sle = data[49];
+			
+			this.flg = 0x00;
+			int xmflg = data[52];
+			
+			// TODO look into the REALLY SCARY STUFF pertaining to sustain + loop --GM
+			
+			if((xmflg & 0x01) != 0)
+				this.flg |= EFLG_ON;
+			if((xmflg & 0x02) != 0)
+				this.flg |= EFLG_SUS;
+			if((xmflg & 0x04) != 0)
+				this.flg |= EFLG_LOOP;
+			
 		}
 		
 		private void loadITv1(RandomAccessFile fp) throws IOException
@@ -214,6 +264,7 @@ public class SessionInstrument
 	
 	public static final int FORMAT_IT100 = 1;
 	public static final int FORMAT_IT200 = 2;
+	public static final int FORMAT_XM = 3;
 	
 	// IMPI bollocks
 	
@@ -253,9 +304,139 @@ public class SessionInstrument
 			case FORMAT_IT200:
 				loadITv2(fp);
 				break;
+			case FORMAT_XM:
+				throw new RuntimeException("incorrect constructor for instrument format");
 			default:
 				throw new RuntimeException("instrument format not supported");
 		}
+	}
+	
+	public SessionInstrument(RandomAccessFile fp, int format, Session session) throws IOException
+	{
+		switch(format)
+		{
+			case FORMAT_XM:
+				loadXM(fp, session);
+				break;
+			case FORMAT_IT100:
+			case FORMAT_IT200:
+				throw new RuntimeException("incorrect constructor for instrument format");
+			default:
+				throw new RuntimeException("instrument format not supported");
+		}
+	}
+	
+	private void loadXM(RandomAccessFile fp, Session session) throws IOException
+	{
+		byte[] b = new byte[22];
+		
+		int ifblen = Integer.reverseBytes(fp.readInt());
+		
+		if(ifblen >= 4+22)
+			this.name = Util.readStringNoNul(fp, b, 22); // let's cheese it a bit
+		else
+			this.name = "";
+		
+		
+		InhibitedFileBlock ifb = new InhibitedFileBlock(fp, ifblen-4-22);
+		
+		int xminstype = ifb.read();
+		int inssmpnum = 0xFFFF&(int)Short.reverseBytes(ifb.readShort());
+		System.out.printf("instr [%d] type %d name \"%s\" smps %d\n", ifblen, xminstype, this.name, inssmpnum);
+		if(inssmpnum > 32)
+			throw new RuntimeException("inssmpnum is too large");
+		//if(xminstype != 0)
+		//	throw new RuntimeException(String.format("XM instrument format %d not supported", xminstype));
+		
+		// abusing properties of InhibitedFileBlock for this loader >:D
+		// (apparently you shouldn't be loading this if inssmpnum == 0)
+		//   --GM
+		int smpheadlen = Integer.reverseBytes(ifb.readInt());
+		System.out.printf("smpheadlen=%d\n", smpheadlen);
+		
+		for(int i = 0; i < 120; i++)
+		{
+			this.nstab[i][0] = i;
+			this.nstab[i][1] = -1;
+		}
+		
+		for(int i = 0; i < 96; i++)
+		{
+			int v = ifb.read();
+			this.nstab[i+12][1] = v;
+		}
+		
+		// OK, buffering volenv/panenv info.
+		
+		int[] volenv_data = new int[53];
+		int[] panenv_data = new int[53];
+		
+		for(int i = 0; i < 48; i++)
+			volenv_data[i] = ifb.read();
+		for(int i = 0; i < 48; i++)
+			panenv_data[i] = ifb.read();
+		
+		volenv_data[48] = ifb.read();
+		panenv_data[48] = ifb.read();
+		
+		for(int i = 0; i < 3; i++)
+			volenv_data[49+i] = ifb.read();
+		for(int i = 0; i < 3; i++)
+			panenv_data[49+i] = ifb.read();
+		
+		volenv_data[52] = ifb.read();
+		panenv_data[52] = ifb.read();
+		
+		int vit = ifb.read();
+		int vis = ifb.read();
+		int vid = ifb.read();
+		int vir = ifb.read();
+		
+		// yeah yeah, whatever, i'm supporting mega fadeouts OK? --GM
+		this.fadeout = ((0xFFFF&(int)Short.reverseBytes(ifb.readShort()))+16)>>5;
+		
+		//System.out.printf("%d %d %d %d %d %d\n", volenv_data[52], panenv_data[52], vit, vis, vid, vir);
+		ifb.done();
+		
+		// load those bloody envelopes
+		env_vol = new Envelope(volenv_data, FORMAT_XM);
+		env_pan = new Envelope(panenv_data, FORMAT_XM);
+		env_per = null;
+		
+		// TEST: disable some stuff for now
+		//this.fadeout = 0;
+		//env_vol = null;
+		//env_pan = null;
+		
+		// load samples
+		SessionSample[] smps = new SessionSample[inssmpnum];
+		
+		for(int i = 0; i < inssmpnum; i++)
+		{
+			smps[i] = new SessionSample(fp, SessionSample.FORMAT_XM, smpheadlen);
+			smps[i].setSampleVibrato(vis, vid, vir, vit);
+		}
+		
+		int[] smpidxlist = session.addSamples(smps);
+		
+		// correct note-sample table
+		for(int i = 0; i < 120; i++)
+		{
+			this.nstab[i][1] = (this.nstab[i][1] < 0 || this.nstab[i][1] >= inssmpnum
+				? 0
+				: smpidxlist[this.nstab[i][1]]
+					);
+			//System.out.printf("nstab %d %d %d\n", i, nstab[i][0], nstab[i][1]);
+		}
+		
+		// load sample data
+		for(int i = 0; i < inssmpnum; i++)
+		{
+			smps[i].loadSampleData(fp, null);
+			smps[i].unrollLoops();
+		}
+		//for(int i = 0; i < smps[i].getLength(); i++)
+		//	System.out.printf("%.3f\n", smps[i].getDataLoop()[0][i]);
 	}
 	
 	private void loadITv1(RandomAccessFile fp) throws IOException

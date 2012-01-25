@@ -525,6 +525,16 @@ public class VirtualChannel
 		note_fade = false;
 		active = mixing = true;
 		vol_fadeout = 1024;
+		
+		if(player.hasCompatGxx())
+		{
+			if(env_vol != null)
+				env_vol.retrig();
+			if(env_pan != null)
+				env_pan.retrig();
+			if(env_per != null)
+				env_per.retrig();
+		}
 		doLoop();
 		doSustainLoop();
 	}

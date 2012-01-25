@@ -12,6 +12,7 @@ public class SessionSample
 	public static final int FORMAT_IT = 1;
 	public static final int FORMAT_MOD = 2;
 	public static final int FORMAT_S3M = 3;
+	public static final int FORMAT_XM = 4;
 	
 	// IMPS bollocks
 	
@@ -61,6 +62,7 @@ public class SessionSample
 			case FORMAT_MOD:
 				loadDataMOD(fp);
 				break;
+			case FORMAT_XM:
 			case FORMAT_S3M:
 				throw new RuntimeException("incorrect constructor for sample format");
 			default:
@@ -75,12 +77,78 @@ public class SessionSample
 			case FORMAT_S3M:
 				loadDataS3M(fp, secondary);
 				break;
+			case FORMAT_XM:
+				loadDataXM(fp, secondary);
+				break;
 			case FORMAT_IT:
 			case FORMAT_MOD:
 				throw new RuntimeException("incorrect constructor for sample format");
 			default:
 				throw new RuntimeException("sample format not supported");
 		}
+	}
+	
+	public void loadDataXM(RandomAccessFile fp, int blklen) throws IOException
+	{
+		System.out.printf("blklen=%d\n", blklen);
+		InhibitedFileBlock ifb = new InhibitedFileBlock(fp, blklen);
+		
+		this.length = Integer.reverseBytes(ifb.readInt());
+		this.lpbeg = Integer.reverseBytes(ifb.readInt());
+		this.lplen = Integer.reverseBytes(ifb.readInt());
+		
+		this.vol = ifb.read();
+		int finetune = (int)(byte)ifb.read();
+		int type = ifb.read();
+		this.dfp = ((ifb.read()+2)>>2)|0x80;
+		int relnote = (int)(byte)ifb.read();
+		ifb.read(); // reserved
+		
+		this.c5speed = (int)(
+			8363.0f
+			* Math.pow(2.0f, ((relnote)*128+finetune)/(128.0f*12.0f))
+			+ 0.5f
+		);
+		
+		System.out.printf("smp c5=%d vol=%d ft=%d type=%d dfp=%d rel=%d\n"
+			,c5speed
+			,vol,finetune,type,dfp,relnote);
+		System.out.printf("l=%d lb=%d ll=%d\n", length, lpbeg, lplen);
+		// TODO / FIXME: skipping name for now because i can't be stuffed --GM
+		for(int i = 0; i < 22; i++)
+			ifb.read();
+		
+		if(this.length != 0)
+		{
+			this.flg = SFLG_EXISTS;
+			this.cvt = SCVT_SIGNED | SCVT_BYTEDELTA;
+			
+			if(lplen != 0)
+			{
+				switch(type & 0x03)
+				{
+					case 0x0:
+						break;
+					case 0x1:
+						this.flg |= SFLG_LOOP;
+						break;
+					case 0x2:
+						this.flg |= SFLG_LOOP | SFLG_BIDI;
+						break;
+					// TODO find out what happens when we use 0x3
+					// (it probably glitches out)
+				}
+				
+			}
+			
+			if((type & 0x10) != 0)
+			{
+				this.flg |= SFLG_16BIT;
+				this.length /= 2;
+			}
+		}
+		
+		ifb.done();
 	}
 	
 	public void loadSampleDataMOD(RandomAccessFile fp) throws IOException
@@ -261,7 +329,7 @@ public class SessionSample
 		unrollLoops();
 	}
 	
-	private void unrollLoops()
+	public void unrollLoops()
 	{
 		//System.out.printf("WORK %d %d %d\n", length, lpbeg, lplen);
 		if(data == null)
@@ -366,13 +434,20 @@ public class SessionSample
 		return offs;
 	}
 	
-	private void loadSampleData(RandomAccessFile fp, float[] d) throws IOException
+	public void loadSampleData(RandomAccessFile fp, float[] d) throws IOException
 	{
-		// TODO: IT214 compression
-		// i think this'll eventually also save samples as IT214/215
-		// using the "crater" algorithm as in munch.py
-		// -- it's better than the official one ~95% of the time,
-		//    and it's a simple and somewhat fast algorithm --GM
+		if(d == null)
+		{
+			this.data = new float[2][];
+			
+			int len = this.length;
+			if((this.flg & SFLG_16BIT) != 0)
+				len *= 2;
+			// XXX: should we consider allowing this for stereo samples? --GM
+			
+			d = new float[len];
+			this.data[0] = this.data[1] = d;
+		}
 		
 		if((flg & SFLG_IT214) != 0)
 			//throw new RuntimeException(String.format("compressed samples not supported"));
@@ -751,5 +826,15 @@ public class SessionSample
 	public int getLength()
 	{
 		return this.length;
+	}
+	
+	// setters
+	
+	public void setSampleVibrato(int vis, int vid, int vir, int vit)
+	{
+		this.vis = vis;
+		this.vid = vid;
+		this.vir = vir;
+		this.vit = vit;
 	}
 }
