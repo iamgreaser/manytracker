@@ -97,7 +97,7 @@ public class SessionInstrument
 				if((env.flg & EFLG_ON) == 0)
 					return this.def;
 				
-				int ret = (pos_idx >= env.num-1) ? env.points[env.num-1][0] : interp(pos_idx, pos_x);
+				int ret = (pos_idx >= env.num-1) ? env.points[env.num < 1 ? 0 : env.num-1][0] : interp(pos_idx, pos_x);
 				
 				boolean useloop = (env.flg & ((sustain ? EFLG_SUS : 0)|EFLG_LOOP)) != 0;
 				int lpb = (sustain && ((env.flg & EFLG_SUS) != 0) ? env.slb : env.lpb);

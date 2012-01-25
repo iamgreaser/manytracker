@@ -284,10 +284,21 @@ public class VirtualChannel
 			int base_pan_c = (pan_import == 100 ? 32 : pan_import) - 32;
 			base_pan_c = base_pan_c + (((32-Math.abs(base_pan_c))*(pan_env-32))>>5);
 			
+			
 			if(base_pan_c < 0)
 				vol2 *= (32+base_pan_c)/32.0f;
 			else
 				vol1 *= (32-base_pan_c)/32.0f;
+			
+			int pansep = player.getPanSep();
+			int ps1 = 128+pansep;
+			int ps2 = 128-pansep;
+			
+			float xvol1 = (ps1*vol1 + ps2*vol2)/256.0f;
+			float xvol2 = (ps1*vol2 + ps2*vol1)/256.0f;
+			
+			vol1 = xvol1;
+			vol2 = xvol2;
 			
 			if(pan_import == 100)
 				vol2 = -vol2;

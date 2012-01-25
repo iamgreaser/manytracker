@@ -269,7 +269,9 @@ public class Session
 				if(!poss_15smp)
 					throw new RuntimeException("not a 15-sample or 31-sample MOD");
 				
+				System.out.println("15-sample module!");
 				smpnum = 15;
+				mktag = "****";
 				break;
 			}
 		}
@@ -335,7 +337,8 @@ public class Session
 			orderlist[i] = 255;
 		
 		// skip M.K. tag
-		fp.readInt();
+		if(smpnum == 31)
+			fp.readInt();
 		
 		// load patterns
 		for(int i = 0; i < patnum; i++)
@@ -541,6 +544,11 @@ public class Session
 	public int getFlags()
 	{
 		return flags;
+	}
+	
+	public int getPanSep()
+	{
+		return sep;
 	}
 	
 	// setters

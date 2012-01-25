@@ -693,4 +693,9 @@ public class Player
 	{
 		return curord;
 	}
+	
+	public int getPanSep()
+	{
+		return session.getPanSep();
+	}
 }
