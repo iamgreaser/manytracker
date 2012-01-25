@@ -45,6 +45,10 @@ public class Player
 	private int[] fbuf_trk = new int[5];
 	private float[][] mixbuf = new float[2][BUFLEN];
 	private byte[] mixbuf_final = new byte[BUFLEN*4];
+	private int fmt_bits = 16;
+	private int fmt_chns = 2;
+	private boolean fmt_signed = true;
+	private boolean fmt_bigend = false;
 	
 	private float mixoffs1 = 0.0f, mixoffs2 = 0.0f;
 	private float mixoffs_spd = calcMixOffsetSpeed();
@@ -65,12 +69,72 @@ public class Player
 		this.session = session;
 	}
 	
+	private void tryLine(float freq, int bits, int chns, boolean signed, boolean bigend)
+	{
+		if(aufp != null)
+			return;
+		
+		base_freq = (int)freq;
+		fmt_bits = bits;
+		fmt_chns = chns;
+		fmt_signed = signed;
+		fmt_bigend = bigend;
+		System.out.printf("attempt: freq = %d, bits = %d, chns = %d, %ssigned, %s-endian\n"
+				, base_freq
+				, bits
+				, chns
+				, signed ? "" : "un"
+				, bigend ? "big" : "little"
+					);
+		try
+		{
+			afmt = new AudioFormat(freq, bits, chns, signed, bigend);
+			aufp = AudioSystem.getSourceDataLine(afmt);
+			System.out.println("LINE SELECTED!");
+		} catch(IllegalArgumentException ex) {
+			System.out.println("IllegalArgumentException");
+			aufp = null;
+		} catch(LineUnavailableException ex) {
+			System.out.println("LineUnavailableException");
+			aufp = null;
+		}
+	}
+	
 	private void openSound()
 	{
 		try
 		{
-			afmt = new AudioFormat((float)base_freq, 16, 2, true, false);
-			aufp = AudioSystem.getSourceDataLine(afmt);
+			aufp = null;
+			System.out.println("Attempting to open audio line");
+			// BRUTE FORCE THAT CRAP
+			// TODO: actually look for a nice line
+			tryLine(48000.0f, 16, 2, true, false); // just in case!
+			
+			tryLine(44100.0f, 16, 2, true, false);
+			tryLine(44100.0f, 16, 2, false, false);
+			tryLine(44100.0f, 16, 2, true, true);
+			tryLine(44100.0f, 16, 2, false, true);
+			tryLine(44100.0f, 8, 2, true, false);
+			tryLine(44100.0f, 8, 2, false, false);
+			tryLine(22050.0f, 16, 2, true, false);
+			tryLine(22050.0f, 16, 2, false, false);
+			tryLine(22050.0f, 16, 2, true, true);
+			tryLine(22050.0f, 16, 2, false, true);
+			tryLine(22050.0f, 8, 2, true, false);
+			tryLine(22050.0f, 8, 2, false, false);
+			tryLine(44100.0f, 16, 1, true, false);
+			tryLine(44100.0f, 16, 1, false, false);
+			tryLine(44100.0f, 16, 1, true, true);
+			tryLine(44100.0f, 16, 1, false, true);
+			tryLine(44100.0f, 8, 1, true, false);
+			tryLine(44100.0f, 8, 1, false, false);
+			tryLine(22050.0f, 16, 1, true, false);
+			tryLine(22050.0f, 16, 1, false, false);
+			tryLine(22050.0f, 16, 1, true, true);
+			tryLine(22050.0f, 16, 1, false, true);
+			tryLine(22050.0f, 8, 1, true, false);
+			tryLine(22050.0f, 8, 1, false, false);
+			
 			aufp.open(afmt);
 			aufp.start();
 			System.out.println("Sound started!");
@@ -121,7 +185,7 @@ public class Player
 	
 	private void writeMix(byte[] b, int offs, int len)
 	{
-		aufp.write(b, offs, len*4);
+		aufp.write(b, offs, len*fmt_chns*((fmt_bits+7)/8));
 	}
 	
 	private void doMix(float[][] f, byte[] b, int offs, int len)
@@ -183,11 +247,28 @@ public class Player
 			int v1 = (int)((fv1 - mixoffs1)*32767.0f);
 			int v2 = (int)((fv2 - mixoffs2)*32767.0f);
 			
-			// little-endian because i can --GM
-			b[j++] = (byte)(v1&255);
-			b[j++] = (byte)((v1>>8)&255);
-			b[j++] = (byte)(v2&255);
-			b[j++] = (byte)((v2>>8)&255);
+			if(!fmt_signed)
+			{
+				v1 += 0x8000;
+				v2 += 0x8000;
+			}
+			
+			if(fmt_bigend)
+				b[j++] = (byte)((v1>>8)&255);
+			if(fmt_bits >= 16)
+				b[j++] = (byte)(v1&255);
+			if(!fmt_bigend)
+				b[j++] = (byte)((v1>>8)&255);
+			
+			if(fmt_chns >= 2)
+			{
+				if(fmt_bigend)
+					b[j++] = (byte)((v2>>8)&255);
+				if(fmt_bits >= 16)
+					b[j++] = (byte)(v2&255);
+				if(!fmt_bigend)
+					b[j++] = (byte)((v2>>8)&255);
+			}
 			
 			if(mixoffs1 > 0.0f)
 			{
@@ -503,7 +584,7 @@ public class Player
 	
 	public boolean hasStereo()
 	{
-		return (session.getFlags() & Session.FLAG_STEREO) != 0;
+		return fmt_chns >= 2 && (session.getFlags() & Session.FLAG_STEREO) != 0;
 	}
 	
 	public boolean hasCompatGxx()
