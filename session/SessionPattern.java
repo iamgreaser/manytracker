@@ -454,6 +454,10 @@ public class SessionPattern
 						case 0x03:
 							ld[4] = (ld[4]>>4)*10+ld[4];
 							break;
+						case 0x14:
+							if(ld[4] <= 33)
+								ld[4] = 0;
+							break;
 						case 0x16:
 							ld[4] *= 2;
 							break;
@@ -484,6 +488,10 @@ public class SessionPattern
 				tracks[chn].setData(r, ld);
 			}
 		}
+		
+		for(int i = 0; i < tracks.length; i++)
+			if(tracks[i] != null)
+				tracks[i].filterS3MEffects();
 		
 		tidx = session.addTracks(tracks);
 	}

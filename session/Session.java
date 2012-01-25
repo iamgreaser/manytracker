@@ -224,6 +224,15 @@ public class Session
 		fp.read(); // NO WE DON'T HAVE A GUS
 		int dfpflag = fp.read();
 		
+		// weird S3M crap
+		// note: assuming default of 6/125
+		// it actually uses the previously-used speed/tempo
+		
+		if(this.spd == 0 || this.spd == 255)
+			this.spd = 6;
+		if(this.bpm < 33)
+			this.bpm = 125;
+		
 		if((this.mv & 0x80) != 0)
 		{
 			this.mv &= ~0x80;
