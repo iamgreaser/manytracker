@@ -678,16 +678,19 @@ public class VirtualChannel
 		filt_res = res;
 	}
 	
-	public void changeInstrument(SessionInstrument cins)
+	public void changeInstrument(SessionInstrument cins, 
+		SessionInstrument.Envelope.Handle env_vol,
+		SessionInstrument.Envelope.Handle env_pan,
+		SessionInstrument.Envelope.Handle env_per)
 	{
 		this.cins = cins;
 		
 		if(cins == null)
 			return;
 		
-		env_vol = cins.getVolEnvHandle();
-		env_pan = cins.getPanEnvHandle();
-		env_per = cins.getPerEnvHandle();
+		this.env_vol = env_vol;
+		this.env_pan = env_pan;
+		this.env_per = env_per;
 	}
 	
 	public void changeSample(SessionSample csmp)

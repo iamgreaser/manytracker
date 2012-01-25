@@ -798,6 +798,13 @@ public class PlayerChannel
 				SessionInstrument h_ins = player.getInstrument(ins);
 				if(h_ins != null)
 				{
+					if(h_ins != cins)
+					{
+						this.env_vol = h_ins.getVolEnvHandle();
+						this.env_pan = h_ins.getPanEnvHandle();
+						this.env_per = h_ins.getPerEnvHandle();
+					}
+					
 					changeVirtualInstrument(h_ins);
 					ins_idx = ins;
 				}
@@ -940,14 +947,8 @@ public class PlayerChannel
 	{
 		this.cins = cins;
 		
-		/*
-		env_vol = cins.getVolEnvHandle();
-		env_pan = cins.getPanEnvHandle();
-		env_per = cins.getPerEnvHandle();
-		*/
-		
 		if(vchn != null)
-			vchn.changeInstrument(cins);
+			vchn.changeInstrument(cins, env_vol, env_pan, env_per);
 	}
 	
 	private void retrigNote()
@@ -964,10 +965,10 @@ public class PlayerChannel
 			allocateVirtualChannel();
 			if(vchn == null)
 				return;
+		} else {
+			vchn.changeInstrument(cins, env_vol, env_pan, env_per);
+			vchn.changeSample(csmp);
 		}
-		
-		vchn.changeInstrument(cins);
-		vchn.changeSample(csmp);
 		vchn.retrig(uoffs);
 	}
 	
@@ -980,7 +981,13 @@ public class PlayerChannel
 			nvchn.reset();
 			nvchn.enslave(this, vchn);
 			nvchn.changeSample(csmp);
-			nvchn.changeInstrument(cins);
+			if(env_vol != null)
+				env_vol = env_vol.dup();
+			if(env_pan != null)
+				env_pan = env_pan.dup();
+			if(env_per != null)
+				env_per = env_per.dup();
+			nvchn.changeInstrument(cins, env_vol, env_pan, env_per);
 		}
 		
 		// XXX: is this a good idea?

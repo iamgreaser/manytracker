@@ -133,6 +133,9 @@ public class SessionInstrument
 			
 			public void stop()
 			{
+				if((env.flg & EFLG_CARRY) != 0)
+					return;
+				
 				pos_x = 0;
 				pos_idx = 0;
 			}
