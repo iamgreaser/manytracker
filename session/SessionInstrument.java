@@ -210,7 +210,7 @@ public class SessionInstrument
 			
 			// TODO look into the REALLY SCARY STUFF pertaining to sustain + loop --GM
 			
-			System.out.printf("%d %d %d %d\n",lpb,lpe,slb,xmflg);
+			System.out.printf("%d %d %d %d %d\n",num,lpb,lpe,slb,xmflg);
 			if((xmflg & 0x01) != 0)
 				this.flg |= EFLG_ON;
 			if((xmflg & 0x02) != 0)
@@ -218,6 +218,13 @@ public class SessionInstrument
 			if((xmflg & 0x04) != 0)
 				this.flg |= EFLG_LOOP;
 			
+			// schism does this, so i might as well try it and see what happens --GM
+			if((this.flg & EFLG_ON) != 0 && (this.flg & EFLG_LOOP) == 0)
+			{
+				this.flg |= EFLG_LOOP;
+				this.lpb = this.lpe = this.num-1;
+			}
+			System.out.printf("%d %d %d %d %d\n",num,lpb,lpe,slb,flg);
 		}
 		
 		private void loadITv1(RandomAccessFile fp) throws IOException

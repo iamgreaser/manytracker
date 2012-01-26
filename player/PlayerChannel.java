@@ -783,7 +783,8 @@ public class PlayerChannel
 			// TODO!
 		} 
 		
-		boolean porta_test_root = (pat_eft != 0x07 && pat_eft != 0x0C);
+		boolean porta_test_root = last_note == 253 || (pat_eft != 0x07 && pat_eft != 0x0C
+			&& !(pat_vol >= 193 && pat_vol < 203));
 		boolean porta_test = ((!isActive()) || porta_test_root);
 		
 		if(note < 120 && cins != null && porta_test)
@@ -906,7 +907,7 @@ public class PlayerChannel
 				
 				if(porta_test_root)
 					latchNoteSpeed();
-			} else if(player.hasCompatGxx()) {
+			} else if(ins != 0 && player.hasCompatGxx()) {
 				if(env_vol != null)
 					env_vol.retrig();
 				if(env_pan != null)
@@ -929,7 +930,7 @@ public class PlayerChannel
 			// note cut
 			noteCut();
 			last_note_was_cut = true;
-		} else if(note != 253) {
+		} else if(note >= 120 && note != 253) {
 			// note fade
 			noteFade();
 		}

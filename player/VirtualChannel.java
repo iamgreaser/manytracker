@@ -216,7 +216,7 @@ public class VirtualChannel
 		if((!note_fade) && env_vol != null && env_vol.fadeCheck(note_off))
 		{
 			//System.out.printf("NOTEFADE volcheck\n");
-			note_fade = true;
+			noteFade();
 		}
 	}
 	
@@ -581,6 +581,8 @@ public class VirtualChannel
 		if(env_per != null)
 			env_per.retrig();
 		this.vol_fadeout = 1024;
+		this.note_off = false;
+		this.note_fade = false;
 	}
 	
 	public void noteOff()

@@ -6,6 +6,10 @@ import java.io.*;
 
 public class SessionPattern
 {
+	public static final int[] GX_VALUE_LUT = {
+		0, 1, 4, 8, 16, 32, 64, 96, 128, 255
+	};
+	
 	/*
 	public static class TrackEntry
 	{
@@ -197,11 +201,24 @@ public class SessionPattern
 				else if(vol >= 0x90 && vol <= 0x9F) // fine vol slide up
 					ld[2] = (vol > 0x99 ? 0x99 : vol)-0x90+65;
 				else if(vol >= 0xB0 && vol <= 0xBF) // vibrato
-					ld[2] = (vol > 0xB9 ? 0xB9 : vol)-0xB0+65;
+					ld[2] = (vol > 0xB9 ? 0xB9 : vol)-0xB0+203;
 				else if(vol >= 0xF0 && vol <= 0xFF) // porta
 				{
-					// TODO FILTER THIS CORRECTLY!!!
-					ld[2] = (vol > 0xF9 ? 0xF9 : vol)-0xF0+65;
+					int spd = (vol > 0xF9 ? 0xF9 : vol)-0xF0;
+					spd *= 16;
+					
+					if(eff == 0 && efp == 0)
+					{
+						// GET IT AWAY FROM ME
+						ld[2] = 255;
+						eff = 3; // gets filtered later
+						ld[4] = spd;
+					} else {
+						// use crap approximation
+						for(int i = 9; i >= 0; i--)
+							if(spd <= GX_VALUE_LUT[i])
+								ld[2] = 193+i;
+					}
 				} else 
 					ld[2] = 255;
 				

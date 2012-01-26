@@ -26,26 +26,28 @@ it has:
 - voleffects!
 - mod loader! probably still has bugs.
 - s3m loader! ditto about the bugs.
+- xm loader! DEFINITELY has bugs (it IS XM, after all)
+- sample VIBRATO wow who uses that (umm... oddly enough i kinda do)
+- pan / vol swing
+- PITCH PAN SEPARATION WOW
+- sample sustain loops!
+- decent s3m pattern filtering! finally, a player that plays SATELL.s3m correctly!
 
 and finally:
 - *PLENTY* of bugs!
 
 it doesn't quite have:
 - MMCMP decompression
-- sample sustain loops (changed the mixing code, and i haven't implemented the necessary function :( )
 - all the effects
 - IT v1 volume envelopes (uses the points instead of the curve... but it sounds fine!)
-- SDx (well, it's there but it doesn't work properly)
+- out of range SDx (passes just as well as modplug does: it doesn't latch the new instrument)
 
 it lacks:
 - any form of input that isn't alt-f4, that X, or ctrl-c
 - any form of networking
-- an xm loader (...i'm going to have to do this crap, aren't i?)
 - a file saver
 - all the panes that aren't the pattern pane
 - embedded MIDI loading / timestamp crap
-- sample vibrato
-- vol/pan swing
 - duplicate check bollocks
 
 some TODOs:
