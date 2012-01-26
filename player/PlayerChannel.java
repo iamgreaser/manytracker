@@ -913,6 +913,8 @@ public class PlayerChannel
 					env_pan.retrig();
 				if(env_per != null)
 					env_per.retrig();
+				if(vchn != null)
+					vchn.retrigEnv();
 			}
 			
 			System.out.printf("note start %d %d %d\n", note, per_note, smp_idx);

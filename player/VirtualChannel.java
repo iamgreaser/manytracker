@@ -572,6 +572,17 @@ public class VirtualChannel
 		doSustainLoop();
 	}
 	
+	public void retrigEnv()
+	{
+		if(env_vol != null)
+			env_vol.retrig();
+		if(env_pan != null)
+			env_pan.retrig();
+		if(env_per != null)
+			env_per.retrig();
+		this.vol_fadeout = 1024;
+	}
+	
 	public void noteOff()
 	{
 		if(note_off)
