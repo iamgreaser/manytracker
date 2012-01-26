@@ -431,8 +431,37 @@ public class SessionSample
 		if((flg & SFLG_SUSLOOP) == 0)
 			return offs;
 		
-		// TODO: do the transfer properly!
-		System.err.printf("TODO: transferLoopSustain where sustain loop actually exists");
+		// get correct offset
+		int rsuslen = ((flg & SFLG_SUSBIDI) != 0 ? suslen*2-1 : suslen);
+		int rlplen = ((flg & SFLG_BIDI) != 0 ? lplen*2-1 : lplen);
+		
+		if(offs > susbeg+rsuslen)
+		{
+			offs -= susbeg;
+			offs %= rsuslen;
+			
+			// fix if going backwards
+			if(offs >= suslen)
+				offs = rsuslen-1-offs;
+			
+			offs += susbeg;
+		}
+		
+		// check if looping
+		if((flg & SFLG_LOOP) == 0)
+			return offs;
+		
+		// TODO: investigate what happens when sustain comes AFTER loop
+		
+		// clamp value
+		
+		if(offs > lpbeg+rlplen)
+		{
+			offs -= lpbeg;
+			offs %= rlplen;
+			offs += lpbeg;
+		}
+		
 		return offs;
 	}
 	

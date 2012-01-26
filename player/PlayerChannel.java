@@ -866,7 +866,7 @@ public class PlayerChannel
 				vol_out = vol_note;
 		}
 		
-		if(note < 120 || (note != 254 && (smpchange || (ins != 0 && !last_note_was_cut))))
+		if(note < 120 || (note != 254 && note != 255 && (smpchange || (ins != 0 && !last_note_was_cut && !isActive()))))
 		{
 			//setNoteTargetByNumber(note);
 			setNoteTargetByNumber(unote);
@@ -918,7 +918,9 @@ public class PlayerChannel
 			System.out.printf("note start %d %d %d\n", note, per_note, smp_idx);
 			// TODO: NNAs!
 			
-		} else if(note == 255) {
+		}
+		
+		if(note == 255) {
 			// note off
 			noteOff();
 		} else if(note == 254) {

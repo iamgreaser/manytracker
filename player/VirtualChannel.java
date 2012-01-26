@@ -519,6 +519,12 @@ public class VirtualChannel
 			}
 		} catch(ArrayIndexOutOfBoundsException ex) {
 			System.err.printf("ARRAYINDEXOUTOFBOUNDSEXCEPTION - TERMINATING CHANNEL!\n");
+			System.out.printf("lp %d-%d %d-%d: %d-%d [%d:%d]\n"
+				,csmp.getLpBeg() ,csmp.getLpLen()
+				,csmp.getSusBeg() ,csmp.getSusLen()
+				,curlpbeg, curlplen
+				,data[0].length,offs
+					);
 			active = false;
 			return;
 		}
@@ -568,8 +574,12 @@ public class VirtualChannel
 	
 	public void noteOff()
 	{
+		if(note_off)
+			return;
+		
 		note_off = true;
 		
+		transferFromSustainLoop();
 		doLoop();
 		
 		if(env_vol != null)
@@ -594,6 +604,9 @@ public class VirtualChannel
 	
 	public void noteFade()
 	{
+		if(note_fade)
+			return;
+		
 		note_fade = true;
 	}
 	
@@ -627,6 +640,16 @@ public class VirtualChannel
 			if((csmp.getFlags() & SessionSample.SFLG_SUSBIDI) != 0)
 				pingpong = true;
 		}
+	}
+	
+	private void transferFromSustainLoop()
+	{
+		if(csmp == null)
+			return;
+		
+		System.out.printf("WAS: %d\n", offs);
+		offs = csmp.transferLoopSustain(offs);
+		System.out.printf("NOW: %d\n", offs);
 	}
 	
 	public boolean imYoursRight(PlayerChannel chn)
