@@ -218,7 +218,11 @@ public class SessionInstrument
 			if((xmflg & 0x04) != 0)
 				this.flg |= EFLG_LOOP;
 			
+			if(this.num == 0)
+				this.flg &= ~EFLG_ON;
+			
 			// schism does this, so i might as well try it and see what happens --GM
+			
 			if((this.flg & EFLG_ON) != 0 && (this.flg & EFLG_LOOP) == 0)
 			{
 				this.flg |= EFLG_LOOP;
