@@ -14,16 +14,35 @@ public class SessionTrack
 			data[i] = new int[] {253, 0, 255, 0, 0};
 	}
 	
-	public void filterS3MEffects()
+	public void filterS3MEffects(SessionTrack sbx_buffer)
 	{
 		int lastnzefp = 0;
+		int lasteft = 0;
 		int lastnzeft = 0;
 		int lastnzvol = 255;
+		int lastnzins = 0;
+		boolean didlastins = false;
+		boolean didvolslide = false;
 		for(int i = 0; i < rows; i++)
 		{
+			int ins = data[i][1];
 			int vol = data[i][2];
 			int eft = data[i][3];
 			int efp = data[i][4];
+			
+			if(efp != 0)
+				lastnzefp = efp;
+			if(ins != 0)
+			{
+				lastnzins = ins;
+				didlastins = true;
+			}
+			
+			if(vol != 255)
+			{
+				lastnzvol = vol;
+				didlastins = false;
+			}
 			
 			// now we look for possible effect memories
 			if(lastnzeft != eft)
@@ -46,15 +65,20 @@ public class SessionTrack
 			}
 			
 			// fix Rxx volumey thing
-			if(eft == 0x12 && vol == 255)
-				data[i][2] = lastnzvol;
+			if(eft == 0x04 || eft == 0x0B || eft == 0x0C)
+				didvolslide = true;
+			if(eft == 0x12 && vol == 255 && didvolslide)
+			{
+				didvolslide = false;
+				if(didlastins)
+					data[i][1] = lastnzins;
+				else
+					data[i][2] = lastnzvol;
+			}
 			
-			if(vol != 255)
-				lastnzvol = vol;
 			if(eft != 0)
 				lastnzeft = eft;
-			if(efp != 0)
-				lastnzefp = efp;
+			lasteft = eft;
 		}
 		
 		// finally, some quick fixes
@@ -65,6 +89,21 @@ public class SessionTrack
 			
 			switch(eft)
 			{
+				// some crap that isn't used in S3M
+				case 0x00:
+				case 0x0D: // no CJA, .s3m doesn't support channel volumes --GM
+				case 0x0E:
+				case 0x10:
+				case 0x17:
+				case 0x18:
+				case 0x19:
+				case 0x1A:
+					eft = efp = 0x00;
+					break;
+				
+				case 0x03:
+					efp = (efp>>4)*10+efp;
+					break;
 				case 0x04:
 					if(
 						   (efp & 0x0F) != 0
@@ -99,13 +138,26 @@ public class SessionTrack
 				case 0x13:
 					switch(efp>>4)
 					{
-						// TODO: somehow shift SBx into one track
+						case 0xB:
+							// TODO: calculate this properly!
+							sbx_buffer.setDataByte(i, 3, eft);
+							sbx_buffer.setDataByte(i, 4, efp);
+							eft = efp = 0;
+							break;
 						case 0xC:
 						case 0xD:
 							if(efp == 0xC0)
 								eft = efp = 0;
 							break;
 					}
+				case 0x14:
+					if(efp <= 33)
+						efp = 0;
+					break;
+				case 0x16:
+					// TODO: actually use Mxx
+					efp *= 2;
+					break;
 			}
 			
 			data[i][3] = eft;

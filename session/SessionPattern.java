@@ -465,50 +465,17 @@ public class SessionPattern
 				{
 					ld[3] = fp.read();
 					ld[4] = fp.read();
-					
-					switch(ld[3])
-					{
-						case 0x03:
-							ld[4] = (ld[4]>>4)*10+ld[4];
-							break;
-						case 0x14:
-							if(ld[4] <= 33)
-								ld[4] = 0;
-							break;
-						case 0x16:
-							ld[4] *= 2;
-							break;
-						case 0x18:
-							// ok apparently IT does this conversion
-							// so let's do the same damn thing
-							if(ld[4] == 0xA4)
-							{
-								ld[3] = 0x13;
-								ld[4] = 0x91;
-							} else {
-								ld[3] = ld[4] = 0x00;
-							}
-							break;
-						// some crap that isn't used in S3M
-						case 0x0D: // no CJA, .s3m doesn't support channel volumes --GM
-						case 0x0E:
-						case 0x10:
-						case 0x17:
-						case 0x19:
-						case 0x1A:
-							ld[3] = ld[4] = 0x00;
-							break;
-						
-					}
 				}
 				
 				tracks[chn].setData(r, ld);
 			}
 		}
 		
-		for(int i = 0; i < tracks.length; i++)
+		SessionTrack sbx_buffer = tracks[32] = new SessionTrack(rows);
+		
+		for(int i = 0; i < 32; i++)
 			if(tracks[i] != null)
-				tracks[i].filterS3MEffects();
+				tracks[i].filterS3MEffects(sbx_buffer);
 		
 		tidx = session.addTracks(tracks);
 	}
