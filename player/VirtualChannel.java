@@ -79,7 +79,7 @@ public class VirtualChannel
 		reset();
 	}
 	
-	public void reset()
+	public synchronized void reset()
 	{
 		csmp = null;
 		cins = null;
@@ -129,7 +129,7 @@ public class VirtualChannel
 		foreground = false;
 	}
 	
-	public void enslave(PlayerChannel chn, VirtualChannel other)
+	public synchronized void enslave(PlayerChannel chn, VirtualChannel other)
 	{
 		if(nextSlave != null)
 			nextSlave.prevSlave = other;
@@ -144,7 +144,7 @@ public class VirtualChannel
 		this.chn = chn;
 	}
 	
-	public void detach()
+	public synchronized void detach()
 	{
 		if(prevSlave != null)
 			prevSlave.nextSlave = nextSlave;
@@ -158,7 +158,7 @@ public class VirtualChannel
 		reset();
 	}
 	
-	public void mix(float[][] buf, int offs, int len)
+	public synchronized void mix(float[][] buf, int offs, int len)
 	{
 		if(!active)
 			return;
@@ -166,7 +166,7 @@ public class VirtualChannel
 		doMix(buf, offs, len);
 	}
 	
-	public void updateEnvelopes()
+	public synchronized void updateEnvelopes()
 	{
 		if(!active)
 			return;
@@ -230,7 +230,7 @@ public class VirtualChannel
 		return vol_calc;
 	}
 	
-	private void calcFilter()
+	private synchronized void calcFilter()
 	{
 		if(!filt_needs_calc)
 			return;
@@ -274,7 +274,7 @@ public class VirtualChannel
 		}
 	}
 	
-	private void doMix(float[][] buf, int boffs, int blen)
+	private synchronized void doMix(float[][] buf, int boffs, int blen)
 	{
 		//System.out.printf("%.3f %d %s\n", vol_import, per_import, csmp);
 		if(csmp == null)
@@ -544,7 +544,7 @@ public class VirtualChannel
 		}
 	}
 	
-	public void retrig(int uoffs)
+	public synchronized void retrig(int uoffs)
 	{
 		offs = uoffs;
 		suboffs = 0;
@@ -572,7 +572,7 @@ public class VirtualChannel
 		doSustainLoop();
 	}
 	
-	public void retrigEnv()
+	public synchronized void retrigEnv()
 	{
 		if(env_vol != null)
 			env_vol.retrig();
@@ -585,7 +585,7 @@ public class VirtualChannel
 		this.note_fade = false;
 	}
 	
-	public void noteOff()
+	public synchronized void noteOff()
 	{
 		if(note_off)
 			return;
@@ -603,7 +603,7 @@ public class VirtualChannel
 			env_per.noteOff();
 	}
 	
-	public void noteCut()
+	public synchronized void noteCut()
 	{
 		active = mixing = false;
 		
@@ -615,7 +615,7 @@ public class VirtualChannel
 			env_per.stop();
 	}
 	
-	public void noteFade()
+	public synchronized void noteFade()
 	{
 		if(note_fade)
 			return;
@@ -623,7 +623,7 @@ public class VirtualChannel
 		note_fade = true;
 	}
 	
-	private void doLoop()
+	private synchronized void doLoop()
 	{
 		looping = pingpong = false;
 		
@@ -639,7 +639,7 @@ public class VirtualChannel
 		}
 	}
 	
-	private void doSustainLoop()
+	private synchronized void doSustainLoop()
 	{
 		if(csmp == null)
 			return;
@@ -655,7 +655,7 @@ public class VirtualChannel
 		}
 	}
 	
-	private void transferFromSustainLoop()
+	private synchronized void transferFromSustainLoop()
 	{
 		if(csmp == null)
 			return;
@@ -714,7 +714,7 @@ public class VirtualChannel
 		filt_res = res;
 	}
 	
-	public void changeInstrument(SessionInstrument cins, 
+	public synchronized void changeInstrument(SessionInstrument cins, 
 		SessionInstrument.Envelope.Handle env_vol,
 		SessionInstrument.Envelope.Handle env_pan,
 		SessionInstrument.Envelope.Handle env_per)
@@ -729,7 +729,7 @@ public class VirtualChannel
 		this.env_per = env_per;
 	}
 	
-	public void changeSample(SessionSample csmp)
+	public synchronized void changeSample(SessionSample csmp)
 	{
 		this.csmp = csmp;
 	}

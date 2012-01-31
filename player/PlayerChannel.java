@@ -320,7 +320,10 @@ public class PlayerChannel
 		//if(player.getITVersion() < 0x210)
 		//	per_note = per_out;
 		
-		eff_efxx_peradd += (mask & 0x0F)*mul*4;
+		//eff_efxx_peradd += (mask & 0x0F)*mul*4;
+		eff_efxx_peradd += mask*mul*4;
+		
+		//System.out.printf("SLIDE! %d %s\n", mask, down ? "D" : "U");
 	}
 	
 	public void doVibrato(int mask, boolean fine)

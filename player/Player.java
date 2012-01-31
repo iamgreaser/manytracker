@@ -144,16 +144,16 @@ public class Player
 		}
 	}
 	
-	public void resetPlayback()
+	private synchronized void resetPlayback()
 	{
+		playing = false;
+		sequencing = false;
+		patlock = false;
+		
 		for(int i = 0; i < chns.length; i++)
 			chns[i].reset();
 		for(int i = 0; i < vchns.length; i++)
 			vchns[i].reset();
-		
-		playing = false;
-		sequencing = false;
-		patlock = false;
 		
 		tempo = session.getTempo();
 		speed = session.getSpeed();
@@ -176,11 +176,81 @@ public class Player
 		rowctr = 1;
 	}
 	
-	public void playFromStart()
+	private synchronized void findPatternOrder(int pat)
 	{
+		for(int i = 0; i < 257; i++)
+		{
+			int ordval = (i < 256 ? session.getOrder(i) : 255);
+			
+			if(ordval == 255)
+			{
+				patlock = true;
+				curpat = session.getPattern(pat);
+				curord = pat;
+				return;
+			}
+			
+			if(ordval >= 0 && ordval <= 253 && pat == ordval)
+			{
+				patlock = false;
+				setOrderDeferred(i);
+				return;
+			}
+		}
+	}
+	
+	public synchronized void playFromStart()
+	{
+		sequencing = false;
+		patlock = false;
 		resetPlayback();
 		sequencing = true;
 		playing = true;
+	}
+	
+	public synchronized void stop()
+	{
+		sequencing = false;
+		playing = false;
+		patlock = false;
+		resetPlayback();
+	}
+	
+	public synchronized void playFromOrder(int ord)
+	{
+		sequencing = false;
+		patlock = false;
+		resetPlayback();
+		setOrderDeferred(ord);
+		sequencing = true;
+		playing = true;
+	}
+	
+	public synchronized void loopPattern(int pat)
+	{
+		sequencing = false;
+		resetPlayback();
+		patlock = true;
+		curpat = session.getPattern(pat);
+		curord = pat;
+		sequencing = true;
+		playing = true;
+	}
+	
+	public synchronized void playFromRow(int pat, int row)
+	{
+		sequencing = false;
+		patlock = false;
+		resetPlayback();
+		findPatternOrder(pat);
+		breakRowDeferred(row);
+		sequencing = true;
+		playing = true;
+	}
+	
+	public synchronized void playNote()
+	{
+		// TODO!
 	}
 	
 	private void writeMix(byte[] b, int offs, int len)
@@ -532,6 +602,9 @@ public class Player
 	
 	private void nextOrder()
 	{
+		if(patlock)
+			return;
+		
 		curord++;
 		while(session.getOrder(curord) == 254)
 			curord++;
@@ -615,6 +688,16 @@ public class Player
 		return (session.getFlags() & Session.FLAG_LINEAR) != 0;
 	}
 	
+	public boolean isSequencing()
+	{
+		return sequencing;
+	}
+	
+	public boolean isPatLock()
+	{
+		return patlock;
+	}
+	
 	// setters
 	
 	public void setSpeed(int speed)
@@ -655,12 +738,13 @@ public class Player
 			this.gvol = itversion < 0x106 ? 0 : 128; // anyone for dubstep? --GM
 	}
 	
-	public void setOrderDeferred(int ord)
+	public synchronized void setOrderDeferred(int ord)
 	{
 		// Bxx, SBx = wait for loopback to finish
 		// SBx, Bxx = who cares about loopback?
 		procrow = -2;
-		curord = ord-1;
+		if(!patlock)
+			curord = ord-1;
 	}
 	
 	public void breakRowDeferred(int row)

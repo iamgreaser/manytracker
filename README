@@ -2,6 +2,14 @@ ManyTracker
 by Ben "GreaseMonkey" Russell and contributors, 2012.
 Public domain.
 
+SOME KEYS. NOTE: this doesn't autostart now!
+
+F5 = play from start
+F6 = play pattern (looped)
+Shift-F6 = play from order
+F7 = play from row
+F8 = STOP <-- very, very important!
+
 ok so current status:
 
 it works fairly well as a player, considering i haven't been working on it for very long.

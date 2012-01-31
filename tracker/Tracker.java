@@ -44,8 +44,12 @@ public class Tracker extends JComponent implements KeyListener, MouseListener, M
 	
 	private int[] lbsel = new int[] {1,1,1,0,0,0};
 	private int[] lboffs = new int[6];
+	private int[] lbmax = new int[] {256,256,65536,256,256,65536};
+	private int[] lbx = new int[7];
+	private int lby = 0;
+	
 	private PaneSelection pane = PaneSelection.PATTERNS;
-	private int patrow = 0, patcol = 0;
+	private int patrow = 0, patcol = 0, patcoloffs = 0;
 	
 	public Tracker(Session session)
 	{
@@ -57,6 +61,14 @@ public class Tracker extends JComponent implements KeyListener, MouseListener, M
 		
 		// add me
 		frame.add(this);
+		
+		// add listeners
+		frame.addKeyListener(this);
+		frame.addMouseListener(this);
+		frame.addMouseMotionListener(this);
+		addKeyListener(this);
+		addMouseListener(this);
+		addMouseMotionListener(this);
 		
 		// prep + show frame
 		frame.pack();
@@ -84,6 +96,20 @@ public class Tracker extends JComponent implements KeyListener, MouseListener, M
 			|| height > buf.getHeight()
 		){
 			buf = new BufferedImage(width+20, height+20, BufferedImage.TYPE_INT_ARGB);
+		}
+		
+		// calculate list boxes
+		for(int x = 0; x <= 6; x++)
+			lbx[x] = (x*width*2+1)/(6*2);
+		
+		lby = (16*(TrackerFont.FNT_XAIMUS.getHeight()+1)+1);
+		
+		for(int i = 0; i < 6; i++)
+		{
+			if(lbsel[i] < lboffs[i])
+				lboffs[i] = lbsel[i];
+			if(lbsel[i] > lboffs[i]+15)
+				lboffs[i] = lbsel[i]-15;
 		}
 	}
 	
@@ -183,7 +209,7 @@ public class Tracker extends JComponent implements KeyListener, MouseListener, M
 			if(pat != null)
 			{
 				rows = pat.getRows();
-				trk = pat.getTrack(i);
+				trk = pat.getTrack(i+patcoloffs);
 			}
 			
 			for(int j = 0, y = ystart; j < heightChars; j++, y += 6)
@@ -235,10 +261,22 @@ public class Tracker extends JComponent implements KeyListener, MouseListener, M
 	private void redrawBuffer(Graphics g)
 	{
 		// update bollocks
-		lbsel[4] = player.getOrder();
-		lbsel[3] = session.getOrder(lbsel[4]);
-		patrow = player.getRow();
-		patcol = 0;
+		synchronized(player)
+		{
+			if(player.isSequencing())
+			{
+				if(player.isPatLock())
+				{
+					lbsel[3] = player.getOrder();
+				} else {
+					lbsel[4] = player.getOrder();
+					if(lbsel[4] < 0)
+						lbsel[4] = 0;
+					lbsel[3] = session.getOrder(lbsel[4]);
+				}
+				patrow = player.getRow();
+			}
+		}
 		
 		// whiteout
 		g.setColor(Color.WHITE);
@@ -248,15 +286,12 @@ public class Tracker extends JComponent implements KeyListener, MouseListener, M
 		g.setColor(Color.BLACK);
 		for(int x = 0; x < 6; x++)
 		{
-			int rx = (x*width*2+1)/12;
-			int nrx = ((x+1)*width*2+1)/12;
-			
-			// TODO: put the proper listboxes in
-			// - using placeholder text for now
+			int rx = lbx[x];
+			int nrx = lbx[x+1];
 			
 			for(int sy = 0; sy < 16; sy++)
 			{
-				int ry = sy*6+1;
+				int ry = sy*(TrackerFont.FNT_XAIMUS.getHeight()+1)+1;
 				int y = sy + lboffs[x];
 				
 				String s = "TODO!";
@@ -333,23 +368,23 @@ public class Tracker extends JComponent implements KeyListener, MouseListener, M
 			}
 			
 			if(x != 0)
-				g.drawLine(rx,0,rx,6*16+1);
+				g.drawLine(rx,0,rx,lby+1);
 			
 			rx = ((x*2+1)*width+1)/12;
-			g.drawLine(rx,6*16+3,rx-13,6*16+16);
-			g.drawLine(rx,6*16+3,rx+13,6*16+16);
-			g.drawLine(rx-13,6*16+16,rx+13,6*16+16);
+			g.drawLine(rx,lby+3,rx-13,lby+16);
+			g.drawLine(rx,lby+3,rx+13,lby+16);
+			g.drawLine(rx-13,lby+16,rx+13,lby+16);
 			
 			if(x == pane.idx)
-				g.fillRect(rx-3, 6*16+8, 7, 7);
+				g.fillRect(rx-3, lby+8, 7, 7);
 		}
-		g.drawLine(0,6*16+1,width,6*16+1);
-		g.drawLine(0,6*16+18,width,6*16+18);
+		g.drawLine(0,lby+1,width,lby+1);
+		g.drawLine(0,lby+18,width,lby+18);
 		
 		switch(pane)
 		{
 			case PATTERNS:
-				patternPane(g, 6*16+19, height);
+				patternPane(g, lby+19, height);
 				break;
 		}
 	}
@@ -371,16 +406,75 @@ public class Tracker extends JComponent implements KeyListener, MouseListener, M
 	public void mouseClicked(MouseEvent ev) {}
 	
 	// key stuff
-	public void keyPressed(KeyEvent ev) {}
+	public void keyPressed(KeyEvent ev)
+	{
+		switch(ev.getKeyCode())
+		{
+			case KeyEvent.VK_F5:
+				player.playFromStart();
+				break;
+			case KeyEvent.VK_F6:
+				if((ev.getModifiers() & KeyEvent.SHIFT_MASK) != 0)
+					player.playFromOrder(lbsel[4]);
+				else
+					player.loopPattern(lbsel[3]);
+				break;
+			case KeyEvent.VK_F7:
+				player.playFromRow(lbsel[3],patrow);
+				break;
+			case KeyEvent.VK_F8:
+				player.stop();
+				break;
+		}
+	}
+	
 	public void keyReleased(KeyEvent ev) {}
 	
 	// mouse stuff
-	public void mousePressed(MouseEvent ev) {}
+	private MouseEvent oldEv = null;
+	public void mousePressed(MouseEvent ev)
+	{
+		oldEv = ev;
+		
+		if(ev.getY() >= 1 && ev.getY() < lby)
+		{
+			for(int i = 0; i < 6; i++)
+				if(ev.getX() > lbx[i] && ev.getX() < lbx[i+1])
+				{
+					lbsel[i] = lboffs[i] +
+						(ev.getY()-1)/(TrackerFont.FNT_XAIMUS.getHeight()+1);
+					
+					return;
+				}
+			
+			return;
+		}
+	}
 	public void mouseReleased(MouseEvent ev) {}
 	public void mouseEntered(MouseEvent ev) {}
 	public void mouseExited(MouseEvent ev) {}
 	public void mouseMoved(MouseEvent ev) {}
-	public void mouseDragged(MouseEvent ev) {}
+	public void mouseDragged(MouseEvent ev)
+	{
+		if(oldEv.getY() >= 1 && oldEv.getY() < lby)
+		{
+			for(int i = 0; i < 6; i++)
+				if(oldEv.getX() > lbx[i] && oldEv.getX() < lbx[i+1])
+				{
+					lbsel[i] = lboffs[i] +
+						(ev.getY()-1)/(TrackerFont.FNT_XAIMUS.getHeight()+1);
+					
+					if(lbsel[i] < 0)
+						lbsel[i] = 0;
+					if(lbsel[i] > lbmax[i]-1)
+						lbsel[i] = lbmax[i]-1;
+					
+					return;
+				}
+			
+			return;
+		}
+	}
 	
 	
 	public static void main(String[] args) throws Exception
@@ -388,7 +482,7 @@ public class Tracker extends JComponent implements KeyListener, MouseListener, M
 		Tracker tracker = new Tracker(new Session(args[0]));
 		Player player = tracker.getPlayer();
 		
-		player.playFromStart();
+		//player.playFromStart();
 		while(true)
 		{
 			player.tick();

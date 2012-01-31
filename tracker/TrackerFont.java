@@ -46,4 +46,14 @@ public class TrackerFont
 			x += width;
 		}
 	}
+	
+	public int getWidth()
+	{
+		return width;
+	}
+	
+	public int getHeight()
+	{
+		return height;
+	}
 }

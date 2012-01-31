@@ -466,6 +466,8 @@ public class Session
 		fp.read(chnpan, 0, 64);
 		fp.read(chnvol, 0, 64);
 		
+		System.out.printf("ver: %04X / compat: %04X\n", cwtv, cmwt);
+		
 		// Load orderlist
 		for(int i = 0; i < ordnum; i++)
 			orderlist[i] = fp.readUnsignedByte();
