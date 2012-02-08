@@ -260,7 +260,7 @@ public class SessionSample
 		System.out.printf("sample name \"%s\"\n", name);
 		
 		this.length = 2*(int)fp.readUnsignedShort();
-		int ft = fp.read();
+		int finetune = fp.read();
 		this.vol = fp.read();
 		this.lpbeg = 2*(int)fp.readUnsignedShort();
 		this.lplen = 2*(int)fp.readUnsignedShort();
@@ -272,7 +272,12 @@ public class SessionSample
 		
 		cvt = SCVT_SIGNED;
 		
-		c5speed = 8363; // TODO: finetune
+		finetune &= 15;
+		c5speed = (int)(8363 * Math.pow(2.0,
+				(finetune >= 8
+					? finetune-16
+					: finetune)*(1.0/(12.0*8.0)))
+			+0.5); // TODO: finetune
 	}
 	
 	public void loadDataIT(RandomAccessFile fp) throws IOException
