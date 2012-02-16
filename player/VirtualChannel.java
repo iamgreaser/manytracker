@@ -267,8 +267,8 @@ public class VirtualChannel
 			filt_c = -e*filt_a;
 			
 			// XXX: attempt to de-NaN the code
-			if(filt_b < -FILTER_NAN_THRESHOLD)
-				filt_b = -FILTER_NAN_THRESHOLD;
+			//if(filt_b < -FILTER_NAN_THRESHOLD)
+			//	filt_b = -FILTER_NAN_THRESHOLD;
 			
 			//System.out.printf("%f %f [%f, %f, %f / %f, %f]\n", filt_k1l, filt_k1r, fa, fb, fc, d, e);
 		}
@@ -352,21 +352,6 @@ public class VirtualChannel
 		if(curlplen <= 0)
 			looping = false;
 		
-		
-		// TODO: work out the appropriate threshold for de-NaN'ing
-		// would also be wise to fiddle with fa,fb,fc
-		// instead of cluttering up the mix function with if statements
-		/*
-		if(outl >= 1.0f)
-			outl = 1.0f;
-		if(outr >= 1.0f)
-			outr = 1.0f;
-		if(outl <= -1.0f)
-			outl = -1.0f;
-		if(outr <= -1.0f)
-			outr = -1.0f;
-		*/
-		
 		float fa = filt_a;
 		float fb = filt_b;
 		float fc = filt_c;
@@ -392,7 +377,6 @@ public class VirtualChannel
 				}	
 			} else if(FILTER_MIX_MONOONLY || ((!FILTER_MIX_STEREOONLY) && (csmp.getFlags() & SessionSample.SFLG_STEREO) == 0)) {
 				// mono sample filter mix
-				// TODO: port this to the stereo sample filter mixer
 				int endx = end - (end-boffs) % 3;
 				
 				float k0 = 0.0f;
@@ -414,6 +398,22 @@ public class VirtualChannel
 					
 					k1 = dl[offs] * fa + k2 * fb + k0 * fc;
 					
+					// clamp k0,k1,k2 - thanks Saga_Musix for that note!
+					if(k0 > 2.0f)
+						k0 = 2.0f;
+					else if(k0 < -2.0f)
+						k0 = -2.0f;
+					
+					if(k1 > 2.0f)
+						k1 = 2.0f;
+					else if(k1 < -2.0f)
+						k1 = -2.0f;
+					
+					if(k2 > 2.0f)
+						k2 = 2.0f;
+					else if(k2 < -2.0f)
+						k2 = -2.0f;
+					
 					suboffs += base_spd;
 					offs += suboffs>>13;
 					suboffs &= (1<<13)-1;
@@ -432,6 +432,11 @@ public class VirtualChannel
 				for(int i = endx; i < end; i++)
 				{
 					float outl = dl[offs] * fa + filt_k1l * fb + filt_k2l * fc;
+					
+					if(outl > 2.0f)
+						outl = 2.0f;
+					if(outl < -2.0f)
+						outl = -2.0f;
 					
 					bufl[i] += outl * vol1;
 					bufr[i] += outl * vol2;
@@ -481,6 +486,37 @@ public class VirtualChannel
 					offs += suboffs>>13;
 					suboffs &= (1<<13)-1;
 					
+					// clamp k0l/k0r, k1l/k1r, k2l/k2r
+					if(k0l > 2.0f)
+						k0l = 2.0f;
+					else if(k0l < -2.0f)
+						k0l = -2.0f;
+					
+					if(k1l > 2.0f)
+						k1l = 2.0f;
+					else if(k1l < -2.0f)
+						k1l = -2.0f;
+					
+					if(k2l > 2.0f)
+						k2l = 2.0f;
+					else if(k2l < -2.0f)
+						k2l = -2.0f;
+						
+					if(k0r > 2.0f)
+						k0r = 2.0f;
+					else if(k0r < -2.0f)
+						k0r = -2.0f;
+					
+					if(k1r > 2.0f)
+						k1r = 2.0f;
+					else if(k1r < -2.0f)
+						k1r = -2.0f;
+					
+					if(k2r > 2.0f)
+						k2r = 2.0f;
+					else if(k2r < -2.0f)
+						k2r = -2.0f;
+					
 					bufl[i] += k0l;
 					bufr[i++] += k0r;
 					bufl[i] += k2l;
@@ -499,6 +535,16 @@ public class VirtualChannel
 					float outl = dl[offs] * vol1 + filt_k1l * fb + filt_k2l * fc;
 					float outr = dr[offs] * vol2 + filt_k1r * fb + filt_k2r * fc;
 					
+					if(outl > 2.0f)
+						outl = 2.0f;
+					if(outl < -2.0f)
+						outl = -2.0f;
+					
+					if(outr > 2.0f)
+						outr = 2.0f;
+					if(outr < -2.0f)
+						outr = -2.0f;
+					
 					bufl[i] += outl;
 					bufr[i] += outr;
 					
@@ -506,6 +552,7 @@ public class VirtualChannel
 					filt_k1l = outl;
 					filt_k2r = filt_k1r;
 					filt_k1r = outr;
+					
 					
 					/*
 					bufl[i] += dl[offs] * vol1;

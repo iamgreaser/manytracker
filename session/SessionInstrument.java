@@ -110,7 +110,8 @@ public class SessionInstrument
 				
 				//System.out.printf("NOSUS %s %d %d %d\n", useloop ? "Y" : "N", lpb, lpe, env.flg);
 				
-				if(useloop && pos_idx >= lpe)
+				// XXX: last thing not extensively tested!!! (it's a weird IT quirk)
+				if(useloop && pos_idx >= lpe && pos_x == env.points[pos_idx][1])
 				{
 					pos_idx = lpb;
 					pos_x = env.points[pos_idx][1]; 
